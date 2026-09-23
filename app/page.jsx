@@ -21,10 +21,8 @@ import {
   Trophy,
   Star,
   User,
-  LogOut,
-  KeyRound,
   ShieldAlert,
-  Users,
+  LogOut,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -39,7 +37,15 @@ const SOUNDS = {
 };
 
 const STORAGE_KEY_PROFILE = "sci_fi_player_profile";
-const STORAGE_KEY_ACCOUNTS = "sci_fi_accounts_database"; // База всех аккаунтов
+const prefixFor = (authId) => `sci_fi_${authId}_`;
+
+const safeParse = (raw, fallback) => {
+  try {
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const getHunterRank = (lvl) => {
   if (lvl >= 25)
@@ -175,13 +181,16 @@ const ACHIEVEMENT_ANIMATIONS = {
 };
 
 export default function HomePage() {
+  // Профиль: { name, authId } — приходит с сервера после входа
   const [profile, setProfile] = useState(null);
-  const [regStep, setRegStep] = useState(1);
-  const [regName, setRegName] = useState("");
-  const [regAuth, setRegAuth] = useState("");
-  const [isRegModalVisible, setIsRegModalVisible] = useState(false);
-  const [savedAccounts, setSavedAccounts] = useState([]);
-  const [isAccountSwitcherOpen, setIsAccountSwitcherOpen] = useState(false);
+
+  // Форма входа / регистрации
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register"
+  const [authName, setAuthName] = useState("");
+  const [authPass, setAuthPass] = useState("");
+  const [authConfirm, setAuthConfirm] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
   // Игровое состояние
   const [level, setLevel] = useState(1);
@@ -195,7 +204,8 @@ export default function HomePage() {
   const [newTaskText, setNewTaskText] = useState("");
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const isFirstRender = useRef(true);
+  // authId аккаунта, чьи данные сейчас загружены (защита от записи чужих данных)
+  const loadedFor = useRef(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDayFinishedModalOpen, setIsDayFinishedModalOpen] = useState(false);
@@ -267,10 +277,10 @@ export default function HomePage() {
     return result;
   };
 
-  // Загрузка базы аккаунтов и текущего профиля
-  const loadAccountData = (targetProfile) => {
+  // Загрузка данных конкретного аккаунта
+  const loadAccountData = (authId) => {
     const today = getTodayString();
-    const keyPrefix = `account_${targetProfile.auth}_`;
+    const keyPrefix = prefixFor(authId);
 
     const savedLevel = localStorage.getItem(`${keyPrefix}level`);
     const savedXp = localStorage.getItem(`${keyPrefix}xp`);
@@ -278,15 +288,16 @@ export default function HomePage() {
     const savedLastCompleted =
       localStorage.getItem(`${keyPrefix}last_completed`) || "";
     const savedDate = localStorage.getItem(`${keyPrefix}date`) || today;
-    const savedHistoryRaw = localStorage.getItem(`${keyPrefix}history`);
-    const savedTasksRaw = localStorage.getItem(`${keyPrefix}tasks`);
-    const savedAchRaw = localStorage.getItem(
-      `${keyPrefix}unlocked_achievements`,
-    );
 
-    let loadedTasks = savedTasksRaw ? JSON.parse(savedTasksRaw) : [];
-    let loadedHistory = savedHistoryRaw ? JSON.parse(savedHistoryRaw) : [];
-    let loadedAch = savedAchRaw ? JSON.parse(savedAchRaw) : [];
+    let loadedTasks = safeParse(localStorage.getItem(`${keyPrefix}tasks`), []);
+    let loadedHistory = safeParse(
+      localStorage.getItem(`${keyPrefix}history`),
+      [],
+    );
+    const loadedAch = safeParse(
+      localStorage.getItem(`${keyPrefix}unlocked_achievements`),
+      [],
+    );
 
     if (savedDate !== today) {
       const yesterdayCompleted = loadedTasks.filter((t) => t.completed);
@@ -313,35 +324,27 @@ export default function HomePage() {
     setHistory(generate7DaysHistory(loadedHistory, loadedTasks));
   };
 
+  // Первая загрузка: восстанавливаем профиль, если он валидный
   useEffect(() => {
-    const rawAccs = localStorage.getItem(STORAGE_KEY_ACCOUNTS);
-    const parsedAccs = rawAccs ? JSON.parse(rawAccs) : [];
-    setSavedAccounts(parsedAccs);
-
-    const savedProfile = localStorage.getItem(STORAGE_KEY_PROFILE);
-    if (savedProfile) {
-      try {
-        const prof = JSON.parse(savedProfile);
-        setProfile(prof);
-        loadAccountData(prof);
-        setIsRegModalVisible(false);
-      } catch {
-        setIsRegModalVisible(true);
-      }
+    const prof = safeParse(localStorage.getItem(STORAGE_KEY_PROFILE), null);
+    if (prof && typeof prof.name === "string" && typeof prof.authId === "string") {
+      loadedFor.current = prof.authId;
+      setProfile(prof);
+      loadAccountData(prof.authId);
     } else {
-      setIsRegModalVisible(true);
+      // Старый формат профиля (name/auth) больше не подходит
+      localStorage.removeItem(STORAGE_KEY_PROFILE);
     }
-
     setIsLoaded(true);
-    isFirstRender.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Сохранение привязано строго к текущему аккаунту
+  // Автосохранение прогресса в аккаунт текущего игрока
   useEffect(() => {
-    if (!isLoaded || isFirstRender.current || !profile) return;
+    if (!isLoaded || !profile || loadedFor.current !== profile.authId) return;
 
     const today = getTodayString();
-    const keyPrefix = `account_${profile.auth}_`;
+    const keyPrefix = prefixFor(profile.authId);
 
     localStorage.setItem(`${keyPrefix}date`, today);
     localStorage.setItem(`${keyPrefix}level`, level.toString());
@@ -375,58 +378,81 @@ export default function HomePage() {
     isLoaded,
   ]);
 
-  const saveProfileAndSwitch = (prof) => {
-    localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(prof));
-    setProfile(prof);
-    isFirstRender.current = true;
-    loadAccountData(prof);
-    setTimeout(() => {
-      isFirstRender.current = false;
-    }, 100);
-  };
+  // Вход / регистрация через API
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    if (authLoading) return;
 
-  const handleRegNext = () => {
-    if (!regName.trim()) {
-      alert("Поле имени не может быть пустым!");
+    const name = authName.trim();
+    if (name.length < 3) {
+      setAuthError("НИКНЕЙМ — МИНИМУМ 3 СИМВОЛА");
       return;
     }
-    setRegStep(2);
-  };
-
-  const handleRegComplete = () => {
-    if (!regAuth.trim()) {
-      alert("Введите аутентификатор!");
+    if (authPass.length < 6) {
+      setAuthError("КОД ДОСТУПА — МИНИМУМ 6 СИМВОЛОВ");
       return;
     }
-    const newProfile = {
-      name: regName.trim(),
-      auth: regAuth.trim().toUpperCase(),
-    };
+    if (authMode === "register" && authPass !== authConfirm) {
+      setAuthError("КОДЫ ДОСТУПА НЕ СОВПАДАЮТ");
+      return;
+    }
 
-    // Обновляем список всех аккаунтов
-    const existing = savedAccounts.filter((a) => a.auth !== newProfile.auth);
-    const updatedAccs = [...existing, newProfile];
-    setSavedAccounts(updatedAccs);
-    localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(updatedAccs));
+    setAuthLoading(true);
+    setAuthError("");
 
-    saveProfileAndSwitch(newProfile);
-    setIsRegModalVisible(false);
-    playSound(SOUNDS.openModal);
+    try {
+      const res = await fetch(
+        authMode === "register" ? "/api/register" : "/api/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nickname: name, password: authPass }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setAuthError(String(data.error || "ОШИБКА СИСТЕМЫ"));
+        return;
+      }
+
+      const prof = { name: data.account.name, authId: data.account.authId };
+      localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(prof));
+      loadedFor.current = prof.authId;
+      setProfile(prof);
+      loadAccountData(prof.authId);
+
+      setAuthName("");
+      setAuthPass("");
+      setAuthConfirm("");
+      setAuthMode("login");
+      playSound(SOUNDS.openModal);
+    } catch {
+      setAuthError("НЕТ СВЯЗИ С СЕРВЕРОМ");
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  const switchAccount = (acc) => {
-    saveProfileAndSwitch(acc);
-    setIsAccountSwitcherOpen(false);
-    playSound(SOUNDS.openModal);
-  };
-
-  const handleResetProfile = () => {
+  const handleLogout = () => {
+    playSound(SOUNDS.closeModal);
     localStorage.removeItem(STORAGE_KEY_PROFILE);
+    loadedFor.current = null;
     setProfile(null);
-    setRegStep(1);
-    setRegName("");
-    setRegAuth("");
-    setIsRegModalVisible(true);
+
+    setLevel(1);
+    setXp(0);
+    setStreak(0);
+    setLastCompletedDate("");
+    setTasks([]);
+    setHistory(generate7DaysHistory([], []));
+    setUnlockedAchievements([]);
+
+    setAuthMode("login");
+    setAuthName("");
+    setAuthPass("");
+    setAuthConfirm("");
+    setAuthError("");
   };
 
   const addXp = (amount) => {
@@ -602,14 +628,18 @@ export default function HomePage() {
     );
   };
 
+  const authInputClass =
+    "w-full box-border bg-[#00f3ff]/[0.05] border border-[#00f3ff] text-[#00f3ff] p-3 font-mono text-base mb-4 outline-none";
+
   return (
     <div className="min-h-[100dvh] bg-black text-cyan-400 font-mono p-3 sm:p-6 flex flex-col justify-between sm:justify-center items-center select-none relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(#06b6d4_1px,transparent_1px)] [background-size:20px_20px] opacity-10 pointer-events-none"></div>
 
-      {/* Модалка регистрации */}
+      {/* Окно входа / регистрации (показывается, пока нет профиля) */}
       <AnimatePresence>
-        {isRegModalVisible && (
+        {!profile && (
           <motion.div
+            key="auth-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -625,130 +655,93 @@ export default function HomePage() {
                   "polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))",
               }}
             >
-              <div className="flex items-center justify-between border-b border-[#00f3ff] pb-2.5 mb-5">
-                <div className="flex items-center">
-                  <div className="w-7 h-7 border-[1.5px] border-[#00f3ff] flex items-center justify-center mr-3 font-bold shadow-[0_0_8px_#00f3ff]">
-                    !
-                  </div>
-                  <div className="text-lg tracking-[2px] uppercase font-bold">
-                    NOTIFICATION // REGISTRATION
-                  </div>
+              <div className="flex items-center border-b border-[#00f3ff] pb-2.5 mb-5">
+                <div className="w-7 h-7 border-[1.5px] border-[#00f3ff] flex items-center justify-center mr-3 font-bold shadow-[0_0_8px_#00f3ff]">
+                  !
                 </div>
-                {profile && (
-                  <button
-                    onClick={() => setIsRegModalVisible(false)}
-                    className="text-[#00f3ff] hover:opacity-75"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                <div className="text-lg tracking-[2px] uppercase font-bold">
+                  ID // OPERATOR
+                </div>
+              </div>
+
+              <form onSubmit={handleAuthSubmit}>
+                <div className="text-sm leading-relaxed mb-4 text-[#b0e0e6]">
+                  {authMode === "login"
+                    ? "[Идентификация] Введите позывной и код доступа."
+                    : "[Регистрация] Создайте позывной и код доступа."}
+                </div>
+
+                <input
+                  type="text"
+                  value={authName}
+                  onChange={(e) => {
+                    setAuthName(e.target.value);
+                    if (authError) setAuthError("");
+                  }}
+                  placeholder="Позывной (никнейм)..."
+                  autoComplete="username"
+                  className={authInputClass}
+                />
+                <input
+                  type="password"
+                  value={authPass}
+                  onChange={(e) => {
+                    setAuthPass(e.target.value);
+                    if (authError) setAuthError("");
+                  }}
+                  placeholder="Код доступа (пароль)..."
+                  autoComplete={
+                    authMode === "login" ? "current-password" : "new-password"
+                  }
+                  className={authInputClass}
+                />
+                {authMode === "register" && (
+                  <input
+                    type="password"
+                    value={authConfirm}
+                    onChange={(e) => {
+                      setAuthConfirm(e.target.value);
+                      if (authError) setAuthError("");
+                    }}
+                    placeholder="Повторите код доступа..."
+                    autoComplete="new-password"
+                    className={authInputClass}
+                  />
                 )}
-              </div>
 
-              {regStep === 1 ? (
-                <div>
-                  <div className="text-sm leading-relaxed mb-5 text-[#b0e0e6]">
-                    [Идентификация личности]
-                    <br />
-                    «Здравствуйте, Охотник. Введите своё имя.»
+                {authError && (
+                  <div className="mb-4 text-xs text-red-400 bg-red-950/40 border border-red-500/40 p-2.5">
+                    {authError}
                   </div>
-                  <input
-                    type="text"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="Введите имя..."
-                    className="w-full box-border bg-[#00f3ff]/[0.05] border border-[#00f3ff] text-[#00f3ff] p-3 font-mono text-base mb-5 outline-none"
-                  />
-                  <button
-                    onClick={handleRegNext}
-                    className="block mx-auto bg-[#00f3ff]/10 border border-[#00f3ff] text-[#00f3ff] py-2.5 px-[30px] font-mono cursor-pointer tracking-[1.5px] uppercase hover:bg-[#00f3ff] hover:text-[#050b14] transition-all"
-                  >
-                    ДАЛЕЕ
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div className="text-sm leading-relaxed mb-5 text-[#b0e0e6]">
-                    [Безопасность системы]
-                    <br />
-                    «Введите персональный аутентификатор (код/ID).»
-                  </div>
-                  <input
-                    type="text"
-                    value={regAuth}
-                    onChange={(e) => setRegAuth(e.target.value)}
-                    placeholder="AUTH-ID-XXXX..."
-                    className="w-full box-border bg-[#00f3ff]/[0.05] border border-[#00f3ff] text-[#00f3ff] p-3 font-mono text-base mb-5 outline-none"
-                  />
-                  <button
-                    onClick={handleRegComplete}
-                    className="block mx-auto bg-[#00f3ff]/10 border border-[#00f3ff] text-[#00f3ff] py-2.5 px-[30px] font-mono cursor-pointer tracking-[1.5px] uppercase hover:bg-[#00f3ff] hover:text-[#050b14] transition-all"
-                  >
-                    ПОДТВЕРДИТЬ
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                )}
 
-      {/* Модалка переключения аккаунтов */}
-      <AnimatePresence>
-        {isAccountSwitcherOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <div className="w-full max-w-sm bg-slate-950 border border-cyan-400 rounded-xl p-5 shadow-[0_0_40px_rgba(6,182,212,0.4)]">
-              <div className="flex items-center justify-between mb-4 border-b border-cyan-500/30 pb-2">
-                <span className="text-xs font-bold uppercase tracking-widest text-white">
-                  ВЫБОР АККАУНТА
-                </span>
                 <button
-                  onClick={() => setIsAccountSwitcherOpen(false)}
-                  className="text-cyan-400"
+                  type="submit"
+                  disabled={authLoading}
+                  className="block w-full bg-[#00f3ff]/10 border border-[#00f3ff] text-[#00f3ff] py-2.5 px-[30px] font-mono cursor-pointer tracking-[1.5px] uppercase hover:bg-[#00f3ff] hover:text-[#050b14] transition-all disabled:opacity-50 disabled:cursor-wait"
                 >
-                  <X className="w-5 h-5" />
+                  {authLoading
+                    ? "ОБРАБОТКА..."
+                    : authMode === "login"
+                      ? "ПОДТВЕРДИТЬ ВХОД"
+                      : "СОЗДАТЬ АККАУНТ"}
                 </button>
-              </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
-                {savedAccounts.map((acc) => (
-                  <button
-                    key={acc.auth}
-                    onClick={() => switchAccount(acc)}
-                    className={`w-full text-left p-3 rounded-lg border flex items-center justify-between ${
-                      profile?.auth === acc.auth
-                        ? "bg-cyan-950/60 border-cyan-400 text-cyan-200"
-                        : "bg-slate-900/40 border-slate-800 text-slate-400"
-                    }`}
-                  >
-                    <div>
-                      <div className="text-xs font-bold text-white">
-                        {acc.name}
-                      </div>
-                      <div className="text-[10px] text-cyan-500 font-mono">
-                        ID: {acc.auth}
-                      </div>
-                    </div>
-                    {profile?.auth === acc.auth && (
-                      <span className="text-[10px] text-cyan-400">АКТИВЕН</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  setIsAccountSwitcherOpen(false);
-                  setRegStep(1);
-                  setIsRegModalVisible(true);
-                }}
-                className="w-full bg-cyan-950 border border-cyan-400/50 text-cyan-300 py-2 rounded-lg text-xs uppercase tracking-wider"
-              >
-                + СОЗДАТЬ НОВЫЙ АККАУНТ
-              </button>
-            </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode(authMode === "login" ? "register" : "login");
+                    setAuthError("");
+                    setAuthConfirm("");
+                  }}
+                  className="block mx-auto mt-4 text-[11px] text-cyan-300 underline hover:text-white cursor-pointer"
+                >
+                  {authMode === "login"
+                    ? "// НЕТ АККАУНТА? ЗАРЕГИСТРИРОВАТЬСЯ"
+                    : "// УЖЕ ЕСТЬ АККАУНТ? ВОЙТИ"}
+                </button>
+              </form>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -776,38 +769,27 @@ export default function HomePage() {
                 <h1 className="text-xs sm:text-sm font-bold tracking-[0.15em] sm:tracking-[0.2em] uppercase text-white drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
                   LEVEL_UP // OS
                 </h1>
-                <button
-                  onClick={() => setIsAccountSwitcherOpen(true)}
-                  className="text-[9px] sm:text-[10px] text-cyan-400 tracking-widest uppercase flex items-center gap-1 hover:text-white transition"
-                >
-                  <User className="w-2.5 h-2.5" />
-                  {profile ? `${profile.name} [${profile.auth}]` : "ГОСТЬ"}{" "}
-                  (СМЕНИТЬ)
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] sm:text-[10px] text-cyan-400 tracking-widest uppercase flex items-center gap-1">
+                    <User className="w-2.5 h-2.5" />
+                    {profile
+                      ? `${profile.name} [${profile.authId}]`
+                      : "ОПЕРАТОР"}
+                  </span>
+                  <span className="text-slate-600">|</span>
+                  <button
+                    onClick={handleLogout}
+                    title="Выйти из системы"
+                    className="text-[9px] sm:text-[10px] text-red-400/80 hover:text-red-400 tracking-widest uppercase flex items-center gap-1 transition"
+                  >
+                    <LogOut className="w-2.5 h-2.5" />
+                    ВЫХОД
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => {
-                  setRegStep(1);
-                  setIsRegModalVisible(true);
-                }}
-                title="Новый аккаунт"
-                className="px-2 py-1 bg-cyan-950/80 border border-cyan-400/40 rounded-md text-cyan-300 hover:bg-cyan-900/60 transition text-[9px] font-bold tracking-wider flex items-center gap-1"
-              >
-                <Users className="w-3 h-3" />
-                <span>РЕГ</span>
-              </button>
-              {profile && (
-                <button
-                  onClick={handleResetProfile}
-                  title="Сбросить профиль"
-                  className="p-1.5 bg-slate-900 border border-cyan-500/30 rounded-md text-cyan-500 hover:text-red-400 hover:border-red-500/50 transition"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              )}
               <div
                 className={`flex items-center gap-1 sm:gap-1.5 bg-cyan-950/80 border px-2 py-0.5 sm:px-3 sm:py-1 rounded-md text-[11px] sm:text-xs font-bold transition-all ${
                   streak > 0

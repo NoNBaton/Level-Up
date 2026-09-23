@@ -2,6 +2,11 @@
 
 import React, { useState } from "react";
 import { ShieldAlert, UserPlus, Check, X } from "lucide-react";
+import {
+  rememberAccount,
+  setCurrentAccountStorage,
+  type Account,
+} from "./SystemAuth";
 
 interface SciFiRegistrationProps {
   onRegisterSuccess?: (account: { username: string; authId: string }) => void;
@@ -13,67 +18,70 @@ export default function SciFiRegistration({
   onClose,
 }: SciFiRegistrationProps) {
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const clearError = () => {
+    if (errorMsg) setErrorMsg("");
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     const trimmedName = username.trim();
 
     if (!trimmedName) {
       setErrorMsg("НИКНЕЙМ НЕ МОЖЕТ БЫТЬ ПУСТЫМ");
       return;
     }
-
     if (trimmedName.length < 3) {
       setErrorMsg("МИНИМАЛЬНАЯ ДЛИНА НИКА — 3 СИМВОЛА");
       return;
     }
-
-    // Получаем список всех зарегистрированных аккаунтов
-    const existingAccountsRaw = localStorage.getItem("solo_hunter_all_accounts");
-    let existingAccounts: Array<{ username: string; authId: string }> = [];
-
-    if (existingAccountsRaw) {
-      try {
-        existingAccounts = JSON.parse(existingAccountsRaw);
-      } catch {}
+    if (password.length < 6) {
+      setErrorMsg("КОД ДОСТУПА — МИНИМУМ 6 СИМВОЛОВ");
+      return;
     }
-
-    // Проверяем уникальность (регистронезависимо)
-    const isTaken = existingAccounts.some(
-      (acc) => acc.username.toLowerCase() === trimmedName.toLowerCase()
-    );
-
-    if (isTaken) {
-      setErrorMsg("ЭТОТ НИКНЕЙМ УЖЕ ЗАНЯТ ДРУГИМ ОХОТНИКОМ");
+    if (password !== confirm) {
+      setErrorMsg("КОДЫ ДОСТУПА НЕ СОВПАДАЮТ");
       return;
     }
 
+    setLoading(true);
     setErrorMsg("");
 
-    const newAccount = {
-      username: trimmedName,
-      authId: `hunter_${Date.now()}`,
-    };
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: trimmedName, password }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-    existingAccounts.push(newAccount);
-    localStorage.setItem(
-      "solo_hunter_all_accounts",
-      JSON.stringify(existingAccounts)
-    );
-    localStorage.setItem(
-      "solo_hunter_current_account",
-      JSON.stringify(newAccount)
-    );
+      if (!res.ok) {
+        setErrorMsg(String(data.error ?? "ОШИБКА СИСТЕМЫ"));
+        return;
+      }
 
-    // Уведомляем систему
-    window.dispatchEvent(new Event("hunter_account_changed"));
-    window.dispatchEvent(new Event("custom_storage_update"));
+      const account: Account = data.account;
+      rememberAccount(account);
+      setCurrentAccountStorage(account);
 
-    if (onRegisterSuccess) {
-      onRegisterSuccess(newAccount);
+      onRegisterSuccess?.({ username: account.name, authId: account.authId });
+    } catch {
+      setErrorMsg("НЕТ СВЯЗИ С СЕРВЕРОМ");
+    } finally {
+      setLoading(false);
     }
   };
+
+  const inputClass =
+    "w-full bg-slate-900/80 border border-cyan-500/30 rounded-xl px-4 py-2.5 text-xs text-cyan-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition";
+  const labelClass =
+    "block text-[10px] tracking-widest text-cyan-500 mb-1.5 uppercase";
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 select-none">
@@ -97,22 +105,47 @@ export default function SciFiRegistration({
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <label className="block text-[10px] tracking-widest text-cyan-500 mb-1.5 uppercase">
-              ПОЗЫВНОЙ (НИКНЕЙМ)
-            </label>
+            <label className={labelClass}>ПОЗЫВНОЙ (НИКНЕЙМ)</label>
             <input
               type="text"
               value={username}
               onChange={(e) => {
                 setUsername(e.target.value);
-                if (errorMsg) setErrorMsg("");
+                clearError();
               }}
               placeholder="Введите никнейм..."
-              className="w-full bg-slate-900/80 border border-cyan-500/30 rounded-xl px-4 py-2.5 text-xs text-cyan-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition"
+              className={inputClass}
             />
           </div>
 
-          {/* Пример исправления ошибки TS2304 с 'none' через условный рендеринг */}
+          <div>
+            <label className={labelClass}>КОД ДОСТУПА (ПАРОЛЬ)</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearError();
+              }}
+              placeholder="Минимум 6 символов..."
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>ПОВТОРИТЕ КОД ДОСТУПА</label>
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => {
+                setConfirm(e.target.value);
+                clearError();
+              }}
+              placeholder="Повторите пароль..."
+              className={inputClass}
+            />
+          </div>
+
           {errorMsg ? (
             <div className="flex items-center gap-2 text-xs text-red-400 bg-red-950/40 border border-red-500/40 p-2.5 rounded-xl">
               <ShieldAlert className="w-4 h-4 shrink-0" />
@@ -120,19 +153,13 @@ export default function SciFiRegistration({
             </div>
           ) : null}
 
-          <div
-            className="text-[10px] text-slate-500 bg-slate-900/40 p-2.5 rounded-lg border border-slate-800"
-            style={{ display: "none" }}
-          >
-            Скрытый блок конфигурации
-          </div>
-
           <button
             type="submit"
-            className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/60 text-cyan-200 font-bold py-3 rounded-xl text-xs tracking-wider uppercase transition shadow-[0_0_15px_rgba(6,182,212,0.2)] flex items-center justify-center gap-2 cursor-pointer"
+            disabled={loading}
+            className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/60 text-cyan-200 font-bold py-3 rounded-xl text-xs tracking-wider uppercase transition shadow-[0_0_15px_rgba(6,182,212,0.2)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-wait"
           >
             <Check className="w-4 h-4" />
-            ИНИЦИАЛИЗИРОВАТЬ ПРОФИЛЬ
+            {loading ? "ИНИЦИАЛИЗАЦИЯ..." : "ИНИЦИАЛИЗИРОВАТЬ ПРОФИЛЬ"}
           </button>
         </form>
       </div>
