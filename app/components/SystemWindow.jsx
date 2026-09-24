@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 
 export const TONES = {
-  blue: { main: "#4fa3e0", glow: "79,163,224" },
+  blue: { main: "#5ecbff", glow: "94,203,255" },
   green: { main: "#34d399", glow: "52,211,153" },
   red: { main: "#ff4d6d", glow: "255,77,109" },
   purple: { main: "#a855f7", glow: "168,85,247" },
@@ -13,34 +13,35 @@ export const TONES = {
 };
 
 const BTN = {
-  blue: "border-[#3b9dff] text-[#cfe6ff] bg-[#3b9dff]/10 hover:bg-[#3b9dff] hover:text-[#020617] shadow-[0_0_14px_rgba(59,157,255,0.4)]",
+  blue: "border-[#5ecbff]/60 text-[#cdeeff] bg-[#5ecbff]/[0.06] hover:bg-[#5ecbff] hover:text-[#020617] shadow-[0_0_8px_rgba(94,203,255,0.2)]",
   green:
-    "border-emerald-400 text-emerald-200 bg-emerald-400/10 hover:bg-emerald-400 hover:text-slate-950 shadow-[0_0_14px_rgba(52,211,153,0.4)]",
-  red: "border-rose-400 text-rose-200 bg-rose-400/10 hover:bg-rose-400 hover:text-slate-950 shadow-[0_0_14px_rgba(251,113,133,0.4)]",
+    "border-emerald-400/60 text-emerald-200 bg-emerald-400/[0.06] hover:bg-emerald-400 hover:text-slate-950 shadow-[0_0_8px_rgba(52,211,153,0.2)]",
+  red: "border-rose-400/60 text-rose-200 bg-rose-400/[0.06] hover:bg-rose-400 hover:text-slate-950 shadow-[0_0_8px_rgba(251,113,133,0.2)]",
   purple:
-    "border-purple-400 text-purple-200 bg-purple-400/10 hover:bg-purple-400 hover:text-slate-950 shadow-[0_0_14px_rgba(168,85,247,0.4)]",
+    "border-purple-400/60 text-purple-200 bg-purple-400/[0.06] hover:bg-purple-400 hover:text-slate-950 shadow-[0_0_8px_rgba(168,85,247,0.2)]",
   amber:
-    "border-amber-400 text-amber-200 bg-amber-400/10 hover:bg-amber-400 hover:text-slate-950 shadow-[0_0_14px_rgba(251,191,36,0.4)]",
+    "border-amber-400/60 text-amber-200 bg-amber-400/[0.06] hover:bg-amber-400 hover:text-slate-950 shadow-[0_0_8px_rgba(251,191,36,0.2)]",
 };
 
-// Шрифты, наклон и мерцание
+// Скошенный «гранёный» край панели, как на референсе System window
+const notch = (size) =>
+  `polygon(${size}px 0, calc(100% - ${size}px) 0, 100% ${size}px, 100% calc(100% - ${size}px), calc(100% - ${size}px) 100%, ${size}px 100%, 0 calc(100% - ${size}px), 0 ${size}px)`;
+
+// Шрифт, парение, мерцание
 function SysStyles() {
   return (
     <style>{`
-@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;500;600;700&family=Audiowide&display=swap');
-.sys-body{font-family:'Titillium Web','Segoe UI',sans-serif;font-weight:500;letter-spacing:0.015em;}
-.sys-title{font-family:'Audiowide','Titillium Web','Segoe UI',sans-serif;font-weight:400;letter-spacing:0.05em;}
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
+.sys-body{font-family:'Rajdhani','Segoe UI',sans-serif;font-weight:400;letter-spacing:0.02em;}
+.sys-title{font-family:'Rajdhani','Segoe UI',sans-serif;font-weight:600;letter-spacing:0.1em;}
 .sys-tilt{transform:none;}
 
-/* Парение: окно медленно покачивается в воздухе */
 @keyframes sysFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 .sys-float{animation:sysFloat 5s ease-in-out infinite;}
 
-/* Парение (мягкое, для главного экрана) */
 @keyframes sysFloatSoft{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 .sys-float-soft{animation:sysFloatSoft 6s ease-in-out infinite;}
 
-/* Мерцание с глитчем: редкие провалы яркости и дрожание по X */
 @keyframes sysFlicker{
   0%,86%,100%{opacity:1;transform:translateX(0);filter:brightness(1)}
   87%{opacity:.55;transform:translateX(-2px);filter:brightness(1.4)}
@@ -54,8 +55,7 @@ function SysStyles() {
 }
 .sys-flicker{animation:sysFlicker 4.5s infinite;}
 
-/* Пульсация свечения */
-@keyframes sysGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
+@keyframes sysGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.08)}}
 .sys-glow{animation:sysGlow 3s ease-in-out infinite;}
 
 @media (prefers-reduced-motion:reduce){
@@ -64,47 +64,31 @@ function SysStyles() {
 `}</style>
   );
 }
-// Толстая неоновая полоса. outer=true: выступает за края окна, как на картинке
-function NeonBar({ t, side, outer }) {
-  const inset = outer ? "-9%" : "0px";
-  const offset = outer ? -22 : 0;
-  const bar = {
-    left: inset,
-    right: inset,
-    [side]: offset,
-    height: outer ? 9 : 3,
-  };
-  const core = {
-    background: `linear-gradient(90deg, transparent 0%, ${t.main} 6%, #dff0ff 30%, #ffffff 50%, #dff0ff 70%, ${t.main} 94%, transparent 100%)`,
-    boxShadow: `0 0 5px #ffffff, 0 0 10px ${t.main}, 0 0 22px rgba(${t.glow},0.55)`,
-    borderRadius: 2,
-  };
-  const tick = (left, w, h) => ({
-    position: "absolute",
-    left,
-    width: w,
-    height: h,
-    [side]: -7,
-    background: t.main,
-    boxShadow: `0 0 8px ${t.main}`,
-  });
 
+// Тонкая двойная линия-скоба над/под окном, как парящие HUD-рамки на референсе
+function HudBracket({ t, side }) {
+  const isTop = side === "top";
   return (
-    <div aria-hidden className="pointer-events-none absolute" style={bar}>
-      <div className="absolute inset-0" style={core} />
-      {outer && (
-        <>
-          <div style={tick("24%", "5%", 4)} />
-          <div style={tick("31%", "2%", 4)} />
-          <div style={tick("66%", "4%", 4)} />
-          <div style={tick("72%", "1.5%", 4)} />
-        </>
-      )}
+    <div
+      aria-hidden
+      className={`pointer-events-none absolute left-[12%] right-[12%] ${isTop ? "-top-2.5" : "-bottom-2.5"} h-2`}
+    >
+      <div
+        className="absolute inset-x-0 top-0 h-px"
+        style={{
+          background: t.main,
+          boxShadow: `0 0 3px ${t.main}, 0 0 8px rgba(${t.glow},0.5)`,
+        }}
+      />
+      <div
+        className="absolute inset-x-[20%] bottom-0 h-px opacity-60"
+        style={{ background: t.main, boxShadow: `0 0 3px ${t.main}` }}
+      />
     </div>
   );
 }
 
-// Рамка «системного окна»
+// Рамка «системного окна»: тёмная почти непрозрачная панель со скошенными углами
 export function SystemFrame({
   tone = "blue",
   className = "",
@@ -113,76 +97,51 @@ export function SystemFrame({
   children,
 }) {
   const t = TONES[tone] || TONES.blue;
-  const corner = "pointer-events-none absolute w-3.5 h-3.5";
-  const c = "rgba(226,240,255,0.95)";
+  const cut = 14;
 
   return (
     <div
       className={`sys-body relative ${className}`}
       style={{
+        clipPath: notch(cut),
         background: glass
-          ? "linear-gradient(180deg, rgba(8,22,52,0.55), rgba(3,10,26,0.68))"
-          : "linear-gradient(180deg, rgba(6,14,32,0.94), rgba(3,8,20,0.96))",
-        border: `1px solid rgba(214,232,255,${glass ? 0.55 : 0.4})`,
-        boxShadow: `0 0 18px rgba(${t.glow},0.18), inset 0 0 30px rgba(${t.glow},0.06)`,
-        backdropFilter: `blur(${glass ? 6 : 10}px)`,
+          ? "linear-gradient(180deg, rgba(8,16,30,0.74), rgba(2,7,16,0.84))"
+          : "linear-gradient(180deg, rgba(6,13,26,0.95), rgba(2,6,13,0.98))",
+        border: `1.5px solid ${t.main}`,
+        boxShadow: `0 0 10px rgba(${t.glow},0.32), inset 0 0 22px rgba(${t.glow},0.05)`,
+        backdropFilter: glass ? "blur(3px)" : "none",
       }}
     >
       <SysStyles />
-      <NeonBar t={t} side="top" outer={outer} />
-      <NeonBar t={t} side="bottom" outer={outer} />
-
-      <div
-        aria-hidden
-        className={`${corner} -left-1 -top-1 border-t-2 border-l-2`}
-        style={{ borderColor: c }}
-      />
-      <div
-        aria-hidden
-        className={`${corner} -right-1 -top-1 border-t-2 border-r-2`}
-        style={{ borderColor: c }}
-      />
-      <div
-        aria-hidden
-        className={`${corner} -left-1 -bottom-1 border-b-2 border-l-2`}
-        style={{ borderColor: c }}
-      />
-      <div
-        aria-hidden
-        className={`${corner} -right-1 -bottom-1 border-b-2 border-r-2`}
-        style={{ borderColor: c }}
-      />
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        style={{
-          background:
-            "repeating-linear-gradient(0deg, #fff 0, #fff 1px, transparent 1px, transparent 3px)",
-        }}
-      />
+      {outer && (
+        <>
+          <HudBracket t={t} side="top" />
+          <HudBracket t={t} side="bottom" />
+        </>
+      )}
       {children}
     </div>
   );
 }
 
-// Квадрат с иконкой; по умолчанию круг с «!»
+// Круг с «!» — тоньше и спокойнее прежнего
 export function IconBox({ tone = "blue", children = "!", size = "w-12 h-12" }) {
   const t = TONES[tone] || TONES.blue;
   const isDefault = children === "!";
   return (
     <div
-      className={`${size} shrink-0 flex items-center justify-center border text-white`}
+      className={`${size} shrink-0 flex items-center justify-center text-white`}
       style={{
-        borderColor: t.main,
-        background: `rgba(${t.glow},0.14)`,
-        boxShadow: `0 0 12px rgba(${t.glow},0.7), inset 0 0 10px rgba(${t.glow},0.35)`,
+        clipPath: notch(6),
+        border: `1px solid ${t.main}`,
+        background: `rgba(${t.glow},0.07)`,
+        boxShadow: `0 0 8px rgba(${t.glow},0.4)`,
       }}
     >
       {isDefault ? (
         <div
-          className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center font-black text-base leading-none"
-          style={{ textShadow: `0 0 8px ${t.main}` }}
+          className="w-6 h-6 rounded-full border border-white/80 flex items-center justify-center font-semibold text-sm leading-none"
+          style={{ textShadow: `0 0 4px ${t.main}` }}
         >
           !
         </div>
@@ -193,37 +152,35 @@ export function IconBox({ tone = "blue", children = "!", size = "w-12 h-12" }) {
   );
 }
 
-// Зелёный подзаголовок, как «OBJECTIFS» на картинке
+// Подзаголовок с тонкой чертой-разделителем под текстом, как «GOAL» на референсе
 export function SysSubtitle({ children, tone = "blue" }) {
-  const t = TONES[tone] || TONES.green;
+  const t = TONES[tone] || TONES.blue;
   return (
-    <div
-      className="sys-title text-center text-sm tracking-[0.22em] uppercase"
-      style={{ color: t.main, textShadow: `0 0 6px rgba(${t.glow},0.55)` }}
-    >
-      {children}
+    <div className="flex flex-col items-center gap-1.5">
+      <div
+        className="sys-title text-center text-xs tracking-[0.22em] uppercase"
+        style={{ color: t.main, textShadow: `0 0 4px rgba(${t.glow},0.5)` }}
+      >
+        {children}
+      </div>
+      <div
+        className="w-10 h-px"
+        style={{ background: `rgba(${t.glow},0.5)` }}
+      />
     </div>
   );
 }
 
-// Строка списка: «- ЗАДАЧА ........ [0/1]»
+// Строка списка: «- ЗАДАЧА ........ [0/1]», без свечения на тексте
 export function SysRow({ label, value, done = false }) {
   return (
-    <div className="flex items-start justify-between gap-3 text-sm tracking-wider">
-      <span
-        className="min-w-0 break-words uppercase text-[#e6f1ff]"
-        style={{ textShadow: "0 0 8px rgba(120,180,255,0.55)" }}
-      >
+    <div className="flex items-start justify-between gap-3 text-sm tracking-wide">
+      <span className="min-w-0 break-words uppercase text-[#dbe7f4]">
         - {String(label)}
       </span>
       <span
-        className="shrink-0 font-bold"
-        style={{
-          color: done ? "#4ade80" : "#dcebff",
-          textShadow: done
-            ? "0 0 10px rgba(74,222,128,0.7)"
-            : "0 0 8px rgba(120,180,255,0.6)",
-        }}
+        className="shrink-0 font-semibold"
+        style={{ color: done ? "#4ade80" : "#a8c6e6" }}
       >
         [{value}]
       </span>
@@ -235,11 +192,12 @@ export function SysInput({ className = "", ...props }) {
   return (
     <input
       {...props}
-      className={`w-full bg-[#020817]/60 border border-[#d6e8ff]/40 focus:border-[#3b9dff] focus:shadow-[0_0_14px_rgba(59,157,255,0.55)] text-[#e6f1ff] placeholder-[#4f7fb5] p-3 text-sm outline-none transition ${className}`}
+      className={`w-full bg-[#050b16]/70 border border-[#5ecbff]/25 focus:border-[#5ecbff] focus:shadow-[0_0_8px_rgba(94,203,255,0.4)] text-[#e6f1ff] placeholder-[#5f86a8] p-3 text-sm outline-none transition ${className}`}
     />
   );
 }
 
+// Кнопка со скошенными углами, как панель
 export function SysButton({
   tone = "blue",
   className = "",
@@ -249,14 +207,15 @@ export function SysButton({
   return (
     <button
       {...props}
-      className={`sys-title border py-2.5 px-4 text-xs tracking-[0.2em] uppercase transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait ${BTN[tone] || BTN.blue} ${className}`}
+      style={{ clipPath: notch(6) }}
+      className={`sys-title border py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait ${BTN[tone] || BTN.blue} ${className}`}
     >
       {children}
     </button>
   );
 }
 
-// Таймер до конца суток с большими часами-секундомером, как на картинке
+// Таймер до конца суток
 export function MidnightTimer({ label = "ДО НОВОГО ДНЯ", tone = "blue" }) {
   const t = TONES[tone] || TONES.blue;
   const [left, setLeft] = useState("--:--:--");
@@ -281,7 +240,9 @@ export function MidnightTimer({ label = "ДО НОВОГО ДНЯ", tone = "blue
     <div className="flex flex-col items-center gap-1.5 mt-6">
       <div
         className="sys-title text-3xl tracking-widest text-white"
-        style={{ textShadow: `0 0 12px ${t.main}, 0 0 26px ${t.main}` }}
+        style={{
+          textShadow: `0 0 6px ${t.main}, 0 0 14px rgba(${t.glow},0.5)`,
+        }}
       >
         {left}
       </div>
@@ -293,7 +254,7 @@ export function MidnightTimer({ label = "ДО НОВОГО ДНЯ", tone = "blue
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
-        style={{ filter: `drop-shadow(0 0 6px ${t.main})` }}
+        style={{ filter: `drop-shadow(0 0 4px ${t.main})` }}
       >
         <circle cx="24" cy="27" r="16" />
         <path d="M19 5h10M24 5v6" />
@@ -350,11 +311,11 @@ export default function SystemWindow({
                   >
                     <div className="flex items-stretch gap-3 px-5 pt-6 pb-3 relative">
                       <IconBox tone={tone}>{icon}</IconBox>
-                      <div className="flex-1 min-w-0 border border-[#d6e8ff]/40 flex items-center justify-center px-3 py-2">
+                      <div className="flex-1 min-w-0 border border-[#5ecbff]/25 flex items-center justify-center px-3 py-2">
                         <h2
-                          className="sys-title uppercase tracking-[0.08em] text-base sm:text-xl truncate text-white"
+                          className="sys-title uppercase tracking-[0.1em] text-base sm:text-xl truncate text-white"
                           style={{
-                            textShadow: `0 0 5px ${t.main}, 0 0 12px rgba(${t.glow},0.55)`,
+                            textShadow: `0 0 4px ${t.main}, 0 0 10px rgba(${t.glow},0.4)`,
                           }}
                         >
                           {title}
@@ -364,7 +325,7 @@ export default function SystemWindow({
                         <button
                           onClick={onClose}
                           aria-label="Закрыть"
-                          className="shrink-0 w-8 flex items-center justify-center text-[#8fb6e6] hover:text-white transition cursor-pointer"
+                          className="shrink-0 w-8 flex items-center justify-center text-[#7fb3d9] hover:text-white transition cursor-pointer"
                         >
                           <X className="w-5 h-5" />
                         </button>

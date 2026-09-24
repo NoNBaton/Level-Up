@@ -810,7 +810,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-[100dvh] bg-black text-cyan-400 font-mono p-3 sm:p-6 flex flex-col justify-between sm:justify-center items-center select-none relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(#3b9dff_1px,transparent_1px)] [background-size:20px_20px] opacity-10 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(#5ecbff_1px,transparent_1px)] [background-size:20px_20px] opacity-10 pointer-events-none"></div>
 
       {/* Окно входа / регистрации */}
       <SystemWindow
@@ -924,12 +924,12 @@ export default function HomePage() {
                   {/* Шапка */}
                   <header className="relative flex items-stretch gap-3 pt-2 mb-3">
                     <IconBox tone="blue">!</IconBox>
-                    <div className="flex-1 min-w-0 border border-[#d6e8ff]/40 flex items-center justify-center px-2 py-2">
+                    <div className="flex-1 min-w-0 border border-[#5ecbff]/40 flex items-center justify-center px-2 py-2">
                       <h1
                         className="sys-title uppercase tracking-[0.08em] text-base sm:text-lg text-white truncate"
                         style={{
                           textShadow:
-                            "0 0 5px #4fa3e0, 0 0 12px rgba(79,163,224,0.55)",
+                            "0 0 5px #5ecbff, 0 0 12px rgba(94,203,255,0.55)",
                         }}
                       >
                         LEVEL_UP // OS
@@ -940,11 +940,11 @@ export default function HomePage() {
                       style={{
                         borderColor:
                           streak > 0
-                            ? "rgba(59,157,255,0.8)"
+                            ? "rgba(94,203,255,0.8)"
                             : "rgba(214,232,255,0.25)",
                         color: streak > 0 ? "#e6f1ff" : "#64748b",
                         boxShadow:
-                          streak > 0 ? "0 0 12px rgba(59,157,255,0.5)" : "none",
+                          streak > 0 ? "0 0 12px rgba(94,203,255,0.5)" : "none",
                       }}
                     >
                       <span
@@ -971,7 +971,7 @@ export default function HomePage() {
                   </header>
 
                   {/* Профиль и выход */}
-                  <div className="flex items-center justify-between gap-3 mb-5 pb-3 border-b border-[#d6e8ff]/20 text-[10px] tracking-widest uppercase">
+                  <div className="flex items-center justify-between gap-3 mb-5 pb-3 border-b border-[#5ecbff]/20 text-[10px] tracking-widest uppercase">
                     <Link
                       href="/profile"
                       className="flex items-center gap-1 min-w-0 text-[#9fd0ff] hover:text-white transition"
@@ -1001,14 +1001,14 @@ export default function HomePage() {
                       <SysRow label="Ранг" value={hunterRankInfo.rank} done />
                       <SysRow label="Опыт" value={`${xp}/${xpPerLevel} XP`} />
                     </div>
-                    <div className="mt-3 h-2.5 border border-[#d6e8ff]/40 bg-[#020817]/60 p-0.5">
+                    <div className="mt-3 h-2.5 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
                       <div
                         className="h-full transition-all duration-500"
                         style={{
                           width: `${(xp / xpPerLevel) * 100}%`,
                           background:
-                            "linear-gradient(90deg, #3b9dff, #dff0ff)",
-                          boxShadow: "0 0 10px #3b9dff",
+                            "linear-gradient(90deg, #5ecbff, #dff0ff)",
+                          boxShadow: "0 0 10px #5ecbff",
                         }}
                       />
                     </div>
@@ -1021,7 +1021,7 @@ export default function HomePage() {
                       value={`${dailyProgress}%`}
                       done={dailyProgress === 100}
                     />
-                    <div className="mt-2 h-2 border border-[#d6e8ff]/40 bg-[#020817]/60 p-0.5">
+                    <div className="mt-2 h-2 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
                       <div
                         className="h-full transition-all duration-300"
                         style={{
@@ -1029,11 +1029,11 @@ export default function HomePage() {
                           background:
                             dailyProgress === 100
                               ? "linear-gradient(90deg, #34d399, #d1fae5)"
-                              : "linear-gradient(90deg, #3b9dff, #dff0ff)",
+                              : "linear-gradient(90deg, #5ecbff, #dff0ff)",
                           boxShadow:
                             dailyProgress === 100
                               ? "0 0 10px #34d399"
-                              : "0 0 10px #3b9dff",
+                              : "0 0 10px #5ecbff",
                         }}
                       />
                     </div>
@@ -1057,8 +1057,8 @@ export default function HomePage() {
                             }}
                             className={`flex flex-col items-center justify-between p-1.5 border text-[9px] transition hover:scale-105 active:scale-95 cursor-pointer ${
                               item.dayOffset === 0
-                                ? "border-[#3b9dff] bg-[#3b9dff]/15 shadow-[0_0_10px_rgba(59,157,255,0.4)]"
-                                : "border-[#d6e8ff]/25 bg-[#020817]/50"
+                                ? "border-[#5ecbff] bg-[#5ecbff]/15 shadow-[0_0_10px_rgba(94,203,255,0.4)]"
+                                : "border-[#5ecbff]/25 bg-[#020817]/50"
                             }`}
                           >
                             <span className="text-[#8fb6e6] text-[8px] truncate max-w-full mb-1">
@@ -1069,7 +1069,7 @@ export default function HomePage() {
                                 full
                                   ? "bg-emerald-400 text-slate-950 border-emerald-300"
                                   : partial
-                                    ? "bg-[#3b9dff]/20 text-[#cfe6ff] border-[#3b9dff]/60"
+                                    ? "bg-[#5ecbff]/20 text-[#cfe6ff] border-[#5ecbff]/60"
                                     : "bg-slate-900 text-slate-600 border-slate-800"
                               }`}
                             >
@@ -1092,7 +1092,7 @@ export default function HomePage() {
                   <div className="grid grid-cols-2 gap-2 mb-5">
                     <Link
                       href="/achievements"
-                      className="sys-title col-span-2 flex items-center justify-between border border-[#3b9dff]/60 bg-[#3b9dff]/10 hover:bg-[#3b9dff] hover:text-[#020617] text-[#cfe6ff] py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition"
+                      className="sys-title col-span-2 flex items-center justify-between border border-[#5ecbff]/60 bg-[#5ecbff]/10 hover:bg-[#5ecbff] hover:text-[#020617] text-[#cfe6ff] py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition"
                     >
                       <span className="flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4" />
@@ -1102,7 +1102,7 @@ export default function HomePage() {
                     </Link>
                     <Link
                       href="/profile"
-                      className="sys-title flex items-center justify-center gap-2 border border-[#3b9dff]/60 bg-[#3b9dff]/10 hover:bg-[#3b9dff] hover:text-[#020617] text-[#cfe6ff] py-2.5 text-xs tracking-[0.15em] uppercase transition"
+                      className="sys-title flex items-center justify-center gap-2 border border-[#5ecbff]/60 bg-[#5ecbff]/10 hover:bg-[#5ecbff] hover:text-[#020617] text-[#cfe6ff] py-2.5 text-xs tracking-[0.15em] uppercase transition"
                     >
                       <User className="w-4 h-4" />
                       ПРОФИЛЬ
@@ -1149,7 +1149,7 @@ export default function HomePage() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="text-center py-5 border border-dashed border-[#3b9dff]/30 text-[#5f86b3] text-xs tracking-widest uppercase"
+                            className="text-center py-5 border border-dashed border-[#5ecbff]/30 text-[#5f86b3] text-xs tracking-widest uppercase"
                           >
                             // НЕТ АКТИВНЫХ КВЕСТОВ
                           </motion.div>
@@ -1251,7 +1251,7 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-            <div className="mt-4 pt-3 border-t border-[#3b9dff]/30">
+            <div className="mt-4 pt-3 border-t border-[#5ecbff]/30">
               <SysRow
                 label="Выполнено"
                 value={`${day.completed}/${day.total}`}
