@@ -120,7 +120,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     input: {
         width: '100%', boxSizing: 'border-box', background: 'rgba(0, 243, 255, 0.05)',
         border: '1px solid #00f3ff', color: '#00f3ff', padding: '12px',
-        fontFamily: 'inherit', fontSize: '1rem', marginBottom: '20px', outline: none
+        fontFamily: 'inherit', fontSize: '1rem', marginBottom: '20px', outline: 'none'
     },
     btn: {
         display: 'block', margin: '0 auto', background: 'rgba(0, 243, 255, 0.1)',
