@@ -1,130 +1,141 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from "react";
+import { ShieldAlert, UserPlus, Check, X } from "lucide-react";
 
-interface PlayerProfile {
-    name: string;
-    auth: string;
+interface SciFiRegistrationProps {
+  onRegisterSuccess?: (account: { username: string; authId: string }) => void;
+  onClose?: () => void;
 }
 
-const STORAGE_KEY = 'sci_fi_player_profile';
+export default function SciFiRegistration({
+  onRegisterSuccess,
+  onClose,
+}: SciFiRegistrationProps) {
+  const [username, setUsername] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
-export default function SciFiRegistration({ onAuthSuccess }: { onAuthSuccess: (profile: PlayerProfile) => void }) {
-    const [step, setStep] = useState<1 | 2>(1);
-    const [name, setName] = useState('');
-    const [auth, setAuth] = useState('');
-    const [isVisible, setIsVisible] = useState(false);
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = username.trim();
 
-    useEffect(() => {
-        // Проверяем localStorage при моннтировании на клиенте
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            onAuthSuccess(JSON.parse(saved));
-        } else {
-            setIsVisible(true);
-        }
-    }, [onAuthSuccess]);
-
-    if (!isVisible) return null;
-
-    const handleNext = () => {
-        if (!name.trim()) {
-            alert('Поле имени не может быть пустым!');
-            return;
-        }
-        setStep(2);
-    };
-
-    const handleComplete = () => {
-        if (!auth.trim()) {
-            alert('Введите аутентификатор!');
-            return;
-        }
-        const profile: PlayerProfile = { name: name.trim(), auth: auth.trim() };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-        setIsVisible(false);
-        onAuthSuccess(profile);
-    };
-
-    return (
-        <div style={styles.overlay}>
-            <div style={styles.box}>
-                <div style={styles.header}>
-                    <div style={styles.icon}>!</div>
-                    <div style={styles.title}>NOTIFICATION // REGISTRATION</div>
-                </div>
-
-                {step === 1 ? (
-                    <div>
-                        <div style={styles.text}>
-                            [Идентификация личности]<br />
-                            «Здравствуйте, Игрок. Введите своё имя.»
-                        </div>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            style={styles.input}
-                            placeholder="Введите имя..."
-                        />
-                        <button onClick={handleNext} style={styles.btn}>ДАЛЕЕ</button>
-                    </div>
-                ) : (
-                    <div>
-                        <div style={styles.text}>
-                            [Безопасность системы]<br />
-                            «Введите персональный аутентификатор (код/ID).»
-                        </div>
-                        <input
-                            type="text"
-                            value={auth}
-                            onChange={(e) => setAuth(e.target.value)}
-                            style={styles.input}
-                            placeholder="AUTH-ID-XXXX..."
-                        />
-                        <button onClick={handleComplete} style={styles.btn}>ПОДТВЕРДИТЬ</button>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-const styles: { [key: string]: React.CSSProperties } = {
-    overlay: {
-        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-        background: 'rgba(0, 5, 15, 0.85)',
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        zIndex: 1000,
-        fontFamily: "'Share Tech Mono', monospace"
-    },
-    box: {
-        width: '480px', padding: '25px',
-        background: 'rgba(3, 10, 25, 0.95)',
-        border: '2px solid #00f3ff',
-        boxShadow: '0 0 30px rgba(0, 243, 255, 0.4), inset 0 0 15px rgba(0, 243, 255, 0.2)',
-        clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
-        color: '#00f3ff'
-    },
-    header: {
-        display: 'flex', alignItems: 'center',
-        borderBottom: '1px solid #00f3ff', paddingBottom: '10px', marginBottom: '20px'
-    },
-    icon: {
-        width: '28px', height: '28px', border: '1.5px solid #00f3ff',
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        marginRight: '12px', fontWeight: 'bold', boxShadow: '0 0 8px #00f3ff'
-    },
-    title: { fontSize: '1.2rem', letterSpacing: '2px', textTransform: 'uppercase' },
-    text: { fontSize: '0.95rem', lineHeight: '1.5', marginBottom: '20px', color: '#b0e0e6' },
-    input: {
-        width: '100%', boxSizing: 'border-box', background: 'rgba(0, 243, 255, 0.05)',
-        border: '1px solid #00f3ff', color: '#00f3ff', padding: '12px',
-        fontFamily: 'inherit', fontSize: '1rem', marginBottom: '20px', outline: 'none'
-    },
-    btn: {
-        display: 'block', margin: '0 auto', background: 'rgba(0, 243, 255, 0.1)',
-        border: '1px solid #00f3ff', color: '#00f3ff', padding: '10px 30px',
-        fontFamily: 'inherit', cursor: 'pointer', letterSpacing: '1.5px', textTransform: 'uppercase'
+    if (!trimmedName) {
+      setErrorMsg("НИКНЕЙМ НЕ МОЖЕТ БЫТЬ ПУСТЫМ");
+      return;
     }
-};
+
+    if (trimmedName.length < 3) {
+      setErrorMsg("МИНИМАЛЬНАЯ ДЛИНА НИКА — 3 СИМВОЛА");
+      return;
+    }
+
+    // Получаем список всех зарегистрированных аккаунтов
+    const existingAccountsRaw = localStorage.getItem("solo_hunter_all_accounts");
+    let existingAccounts: Array<{ username: string; authId: string }> = [];
+
+    if (existingAccountsRaw) {
+      try {
+        existingAccounts = JSON.parse(existingAccountsRaw);
+      } catch {}
+    }
+
+    // Проверяем уникальность (регистронезависимо)
+    const isTaken = existingAccounts.some(
+      (acc) => acc.username.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (isTaken) {
+      setErrorMsg("ЭТОТ НИКНЕЙМ УЖЕ ЗАНЯТ ДРУГИМ ОХОТНИКОМ");
+      return;
+    }
+
+    setErrorMsg("");
+
+    const newAccount = {
+      username: trimmedName,
+      authId: `hunter_${Date.now()}`,
+    };
+
+    existingAccounts.push(newAccount);
+    localStorage.setItem(
+      "solo_hunter_all_accounts",
+      JSON.stringify(existingAccounts)
+    );
+    localStorage.setItem(
+      "solo_hunter_current_account",
+      JSON.stringify(newAccount)
+    );
+
+    // Уведомляем систему
+    window.dispatchEvent(new Event("hunter_account_changed"));
+    window.dispatchEvent(new Event("custom_storage_update"));
+
+    if (onRegisterSuccess) {
+      onRegisterSuccess(newAccount);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 select-none">
+      <div className="w-full max-w-md bg-slate-950 border border-cyan-500/50 rounded-2xl p-6 relative shadow-[0_0_50px_rgba(6,182,212,0.25)] font-mono text-cyan-400">
+        <div className="flex items-center justify-between border-b border-cyan-500/20 pb-4 mb-5">
+          <div className="flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-cyan-400" />
+            <h2 className="text-sm font-bold tracking-widest uppercase text-white">
+              РЕГИСТРАЦИЯ ОХОТНИКА
+            </h2>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-slate-500 hover:text-cyan-400 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        <form onSubmit={handleRegister} className="space-y-4">
+          <div>
+            <label className="block text-[10px] tracking-widest text-cyan-500 mb-1.5 uppercase">
+              ПОЗЫВНОЙ (НИКНЕЙМ)
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (errorMsg) setErrorMsg("");
+              }}
+              placeholder="Введите никнейм..."
+              className="w-full bg-slate-900/80 border border-cyan-500/30 rounded-xl px-4 py-2.5 text-xs text-cyan-100 placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition"
+            />
+          </div>
+
+          {/* Пример исправления ошибки TS2304 с 'none' через условный рендеринг */}
+          {errorMsg ? (
+            <div className="flex items-center gap-2 text-xs text-red-400 bg-red-950/40 border border-red-500/40 p-2.5 rounded-xl">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          ) : null}
+
+          <div
+            className="text-[10px] text-slate-500 bg-slate-900/40 p-2.5 rounded-lg border border-slate-800"
+            style={{ display: "none" }}
+          >
+            Скрытый блок конфигурации
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/60 text-cyan-200 font-bold py-3 rounded-xl text-xs tracking-wider uppercase transition shadow-[0_0_15px_rgba(6,182,212,0.2)] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Check className="w-4 h-4" />
+            ИНИЦИАЛИЗИРОВАТЬ ПРОФИЛЬ
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
