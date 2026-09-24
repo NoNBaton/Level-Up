@@ -13,6 +13,14 @@ model Player {
   passwordHash String
   level        Int      @default(1)
   xp           Int      @default(0)
+  streak       Int      @default(0)
   rank         String   @default("E-РАНГ")
+  bio          String   @default("")
+  avatar       String   @default("cyan")
+  achievements String[] @default([])
+  progress     Json     @default("{}")
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([level, xp])
 }

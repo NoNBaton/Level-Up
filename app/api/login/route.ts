@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { setSession } from "@/lib/session";
+import { authIdFor, privatePlayer } from "@/lib/player";
 
 export async function POST(req: Request) {
   try {
@@ -20,12 +22,12 @@ export async function POST(req: Request) {
       );
     }
 
+    await setSession(player.id);
+
     return NextResponse.json({
       status: "ok",
-      account: {
-        name: player.nickname,
-        authId: "ID-" + player.id.slice(0, 8).toUpperCase(),
-      },
+      account: { name: player.nickname, authId: authIdFor(player.id) },
+      player: privatePlayer(player),
     });
   } catch (error) {
     console.error(error);

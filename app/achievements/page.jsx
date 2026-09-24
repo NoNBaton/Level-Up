@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ShieldCheck,
   Flame,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { SystemFrame, IconBox } from "../components/SystemWindow";
 
 const ACHIEVEMENTS = [
   // --- РАЗДЕЛ: СТРИК ---
@@ -265,146 +266,119 @@ const ACHIEVEMENTS = [
 ];
 
 export default function AchievementsPage() {
-  const [streak, setStreak] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [completedTasksCount, setCompletedTasksCount] = useState(0);
-  const [unlockedIds, setUnlockedIds] = useState([]);
+  const TABS = [
+    { id: "streak", label: "КВЕСТЫ", Icon: Flame },
+    { id: "creed", label: "ОХОТА", Icon: Swords },
+    { id: "level", label: "КЛАСС", Icon: Zap },
+    { id: "elite", label: "ТЕНИ", Icon: Skull, purple: true },
+  ];
+
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  // Всего выполненных миссий: берём счётчик с сервера, иначе считаем по истории
+  function totalCompleted(prog) {
+    if (Number.isFinite(prog.completedTotal)) {
+      return Math.max(0, Math.floor(prog.completedTotal));
+    }
+    const today = todayStr();
+    const hist = Array.isArray(prog.history) ? prog.history : [];
+    const fromHistory = hist
+      .filter((h) => h && h.date !== today)
+      .reduce((sum, h) => sum + (Number(h.completed) || 0), 0);
+    const tasks = Array.isArray(prog.tasks) ? prog.tasks : [];
+    return fromHistory + tasks.filter((t) => t && t.completed).length;
+  }
+
+  const [stats, setStats] = useState({ streak: 0, level: 1, tasks: 0 });
+  const [state, setState] = useState("loading"); // loading | ok | guest | error
   const [activeTab, setActiveTab] = useState("streak");
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const getPrefix = () => {
-    let prefix = "levelup_";
-    const currentAccRaw = localStorage.getItem("solo_hunter_current_account");
-    if (currentAccRaw && currentAccRaw.trim() !== "") {
-      try {
-        const parsedAcc = JSON.parse(currentAccRaw);
-        if (parsedAcc?.authId) {
-          prefix = `hunter_${parsedAcc.authId}_`;
-        }
-      } catch {}
-    }
-    return prefix;
-  };
-
-  const syncAchievements = () => {
-    const prefix = getPrefix();
-    // Для именного аккаунта (hunter_{authId}_) НЕЛЬЗЯ откатываться на общие
-    // ключи levelup_*/streak/tasks — там могут лежать данные другого аккаунта
-    // или гостевой сессии, и именно это вызывало "утечку" старого прогресса
-    // на новые аккаунты. Общий фолбэк оставляем только для гостя (без authId),
-    // чтобы не терять старые данные пользователей, у которых ещё нет аккаунта.
-    const isAccountMode = prefix.startsWith("hunter_");
-
-    const savedStreak = isAccountMode
-      ? (localStorage.getItem(`${prefix}streak`) ?? "0")
-      : (localStorage.getItem(`${prefix}streak`) ??
-        localStorage.getItem("levelup_streak") ??
-        localStorage.getItem("streak") ??
-        "0");
-    const savedLevel = isAccountMode
-      ? (localStorage.getItem(`${prefix}level`) ?? "1")
-      : (localStorage.getItem(`${prefix}level`) ??
-        localStorage.getItem("levelup_level") ??
-        localStorage.getItem("level") ??
-        "1");
-    const savedTasksRaw = isAccountMode
-      ? localStorage.getItem(`${prefix}tasks`)
-      : (localStorage.getItem(`${prefix}tasks`) ??
-        localStorage.getItem("levelup_tasks") ??
-        localStorage.getItem("tasks"));
-
-    const currentStreak = Number(savedStreak) || 0;
-    const currentLevel = Number(savedLevel) || 1;
-    let currentTasksCount = 0;
-
-    if (savedTasksRaw && savedTasksRaw.trim() !== "") {
-      try {
-        const parsedTasks = JSON.parse(savedTasksRaw);
-        if (Array.isArray(parsedTasks)) {
-          currentTasksCount = parsedTasks.filter(
-            (t) => t && (t.completed || t.status === "completed"),
-          ).length;
-        } else if (typeof parsedTasks === "object") {
-          // фоллбэк если обертка с массивом квестов
-          const arr = parsedTasks.quests || parsedTasks.tasks || [];
-          if (Array.isArray(arr)) {
-            currentTasksCount = arr.filter(
-              (t) => t && (t.completed || t.status === "completed"),
-            ).length;
-          }
-        }
-      } catch (e) {
-        // игнорируем ошибку парсинга
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/me", { cache: "no-store" });
+      if (res.status === 401) {
+        setState("guest");
+        return;
       }
-    }
-    // Если по пермиссионному ключу счетчик хранится отдельно
-    const countFallback = isAccountMode
-      ? localStorage.getItem(`${prefix}completed_count`)
-      : localStorage.getItem(`${prefix}completed_count`) ||
-        localStorage.getItem("levelup_completed_count");
-    if (countFallback) {
-      currentTasksCount = Math.max(
-        currentTasksCount,
-        Number(countFallback) || 0,
-      );
-    }
-
-    setStreak(currentStreak);
-    setLevel(currentLevel);
-    setCompletedTasksCount(currentTasksCount);
-
-    const validUnlocked = ACHIEVEMENTS.filter((ach) => {
-      const numLevel = Number(currentLevel) || 1;
-      const numStreak = Number(currentStreak) || 0;
-      const numTasks = Number(currentTasksCount) || 0;
-
-      if (ach.customCheck) {
-        return ach.customCheck(numLevel, numStreak, numTasks);
+      if (!res.ok) {
+        setState("error");
+        return;
       }
-      if (ach.category === "streak") return numStreak >= ach.req;
-      if (ach.category === "creed") return numTasks >= ach.req;
-      if (ach.category === "level") return numLevel >= ach.req;
-      return false;
-    }).map((a) => a.id);
-
-    setUnlockedIds(validUnlocked);
-    localStorage.setItem(
-      `${prefix}unlocked_achievements`,
-      JSON.stringify(validUnlocked),
-    );
-  };
-
-  useEffect(() => {
-    syncAchievements();
-    setIsLoaded(true);
-
-    const handleUpdate = () => {
-      syncAchievements();
-    };
-
-    window.addEventListener("hunter_account_changed", handleUpdate);
-    window.addEventListener("storage", handleUpdate);
-    window.addEventListener("custom_storage_update", handleUpdate);
-
-    return () => {
-      window.removeEventListener("hunter_account_changed", handleUpdate);
-      window.removeEventListener("storage", handleUpdate);
-      window.removeEventListener("custom_storage_update", handleUpdate);
-    };
+      const { player } = await res.json();
+      const prog =
+        player.progress && typeof player.progress === "object"
+          ? player.progress
+          : {};
+      setStats({
+        streak: Number(player.streak) || 0,
+        level: Number(player.level) || 1,
+        tasks: totalCompleted(prog),
+      });
+      setState("ok");
+    } catch {
+      setState("error");
+    }
   }, []);
 
-  const handleHardReset = () => {
-    const prefix = getPrefix();
-    localStorage.removeItem(`${prefix}unlocked_achievements`);
-    localStorage.removeItem("unlocked_achievements");
-    syncAchievements();
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   };
 
-  if (!isLoaded) {
+  const unlockedIds = useMemo(
+    () =>
+      ACHIEVEMENTS.filter((ach) => {
+        if (ach.customCheck) {
+          return ach.customCheck(stats.level, stats.streak, stats.tasks);
+        }
+        if (ach.category === "streak") return stats.streak >= ach.req;
+        if (ach.category === "creed") return stats.tasks >= ach.req;
+        if (ach.category === "level") return stats.level >= ach.req;
+        return false;
+      }).map((a) => a.id),
+    [stats],
+  );
+
+  const isUnlocked = (ach) => unlockedIds.includes(ach.id);
+
+  const progressText = (ach) => {
+    if (ach.category === "streak")
+      return `${Math.min(stats.streak, ach.req)}/${ach.req}`;
+    if (ach.category === "creed")
+      return `${Math.min(stats.tasks, ach.req)}/${ach.req}`;
+    if (ach.category === "level")
+      return `${Math.min(stats.level, ach.req)}/${ach.req}`;
+    return isUnlocked(ach) ? "1/1" : "0/1";
+  };
+
+  const unitLabel = (ach) =>
+    ach.category === "streak"
+      ? "ДНЕЙ"
+      : ach.category === "creed"
+        ? "МИССИЙ"
+        : ach.category === "level"
+          ? "LVL"
+          : "УСЛОВИЕ";
+
+  const unlockedCount = unlockedIds.length;
+  const list = ACHIEVEMENTS.filter((a) => a.category === activeTab);
+
+  if (state === "loading") {
     return (
       <div className="min-h-[100dvh] bg-black text-cyan-400 font-mono flex justify-center items-center p-4">
-        <div className="flex items-center gap-2 border border-cyan-500/50 p-4 rounded-xl bg-cyan-950/20 backdrop-blur">
-          <Cpu className="w-5 h-5 animate-spin text-cyan-400" />
+        <div className="flex items-center gap-2 border border-[#3b9dff]/50 p-4 rounded-xl bg-[#3b9dff]/10 backdrop-blur">
+          <Cpu className="w-5 h-5 animate-spin text-[#3b9dff]" />
           <span className="text-xs tracking-[0.3em] uppercase animate-pulse">
             СИНХРОНИЗАЦИЯ С СИСТЕМОЙ...
           </span>
@@ -413,219 +387,210 @@ export default function AchievementsPage() {
     );
   }
 
-  const checkUnlocked = (ach) => unlockedIds.includes(ach.id);
-
-  const getCurrentProgress = (ach) => {
-    const numLevel = Number(level) || 1;
-    const numStreak = Number(streak) || 0;
-    const numTasks = Number(completedTasksCount) || 0;
-
-    if (ach.category === "streak")
-      return `${Math.min(numStreak, ach.req)}/${ach.req}`;
-    if (ach.category === "creed")
-      return `${Math.min(numTasks, ach.req)}/${ach.req}`;
-    if (ach.category === "level")
-      return `${Math.min(numLevel, ach.req)}/${ach.req}`;
-    if (ach.category === "elite") return checkUnlocked(ach) ? "1/1" : "0/1";
-    return "0";
-  };
-
-  const unlockedCount = ACHIEVEMENTS.filter((a) => checkUnlocked(a)).length;
-  const filteredAchievements = ACHIEVEMENTS.filter(
-    (a) => a.category === activeTab,
-  );
-
   return (
-    <div className="min-h-[100dvh] bg-black text-cyan-400 font-mono p-4 sm:p-6 flex flex-col items-center justify-center relative overflow-hidden select-none">
-      <div className="absolute inset-0 bg-[radial-gradient(#06b6d4_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none"></div>
+    <div className="min-h-[100dvh] bg-black text-[#cfe6ff] font-mono p-4 sm:p-6 flex flex-col items-center justify-center relative overflow-hidden select-none">
+      <div className="absolute inset-0 bg-[radial-gradient(#3b9dff_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none"></div>
 
-      <main className="w-full max-w-md bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-5 sm:p-6 backdrop-blur-xl shadow-[0_0_50px_rgba(6,182,212,0.2)] relative z-10 flex flex-col max-h-[92vh] my-auto">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-cyan-400/80 shadow-[0_0_10px_#22d3ee] animate-pulse"></div>
-
-        {/* Шапка с кнопкой назад и сбросом */}
-        <header className="flex items-center justify-between border-b border-cyan-500/20 pb-4 mb-4 shrink-0">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-cyan-400 hover:text-cyan-200 transition bg-cyan-950/50 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase no-underline"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            НАЗАД
-          </Link>
-
-          <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-purple-400" />
-            <span className="text-xs font-bold tracking-widest text-white uppercase">
-              СИСТЕМА: ДОСТИЖЕНИЯ
-            </span>
+      <SystemFrame
+        tone="blue"
+        className="w-full max-w-md p-5 sm:p-6 relative z-10 flex flex-col max-h-[92dvh] my-auto overflow-hidden"
+      >
+        {/* Шапка */}
+        <header className="flex items-stretch gap-3 mb-4 shrink-0 relative">
+          <IconBox tone="blue">!</IconBox>
+          <div className="flex-1 min-w-0 border border-[#3b9dff]/40 flex items-center justify-center px-3">
+            <h1
+              className="text-sm font-black tracking-[0.16em] uppercase text-white truncate"
+              style={{ textShadow: "0 0 8px #3b9dff, 0 0 18px #3b9dff" }}
+            >
+              ДОСТИЖЕНИЯ
+            </h1>
           </div>
-
           <button
-            onClick={handleHardReset}
-            title="Очистить и пересчитать достижения"
-            className="p-1.5 rounded-lg bg-red-950/40 border border-red-500/40 text-red-400 hover:bg-red-900/50 transition cursor-pointer"
+            onClick={refresh}
+            disabled={refreshing}
+            title="Обновить данные"
+            className="shrink-0 w-9 flex items-center justify-center border border-[#3b9dff]/40 text-[#7fa8d6] hover:text-white hover:border-[#3b9dff] transition cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw
+              className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+            />
           </button>
         </header>
 
-        {/* Общий прогресс */}
-        <section className="bg-slate-900/60 border border-purple-500/30 p-3.5 rounded-xl mb-4 shrink-0 shadow-[0_0_15px_rgba(168,85,247,0.1)]">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-purple-400 font-bold tracking-wider uppercase flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-purple-400" />
-              Уровень Синхронизации
-            </span>
-            <span className="text-xs font-black text-purple-300 tracking-widest">
-              {unlockedCount} / {ACHIEVEMENTS.length}
-            </span>
+        <Link
+          href="/"
+          className="mb-4 shrink-0 inline-flex items-center gap-2 self-start text-[#9fd0ff] hover:text-white transition border border-[#3b9dff]/40 px-3 py-1.5 text-xs font-bold tracking-wider uppercase no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          НАЗАД
+        </Link>
+
+        {state === "guest" && (
+          <div className="text-center border border-dashed border-[#3b9dff]/40 p-6 text-xs tracking-widest">
+            ВЫ НЕ АВТОРИЗОВАНЫ.
+            <br />
+            <Link
+              href="/"
+              className="underline text-[#9fd0ff] hover:text-white"
+            >
+              ВОЙТИ В СИСТЕМУ
+            </Link>
           </div>
+        )}
 
-          <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-purple-500/30">
-            <div
-              className="h-full bg-purple-500 rounded-full transition-all duration-500 shadow-[0_0_10px_#a855f7]"
-              style={{
-                width: `${(unlockedCount / ACHIEVEMENTS.length) * 100}%`,
-              }}
-            ></div>
+        {state === "error" && (
+          <div className="text-center text-xs text-rose-300 border border-rose-500/40 p-4 tracking-wider">
+            НЕ УДАЛОСЬ ЗАГРУЗИТЬ ДАННЫЕ
           </div>
-        </section>
+        )}
 
-        {/* Вкладки разделов (Табы) */}
-        <div className="grid grid-cols-4 gap-1.5 mb-4 shrink-0">
-          <button
-            onClick={() => setActiveTab("streak")}
-            className={`py-2 px-1 rounded-lg border text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 transition cursor-pointer ${
-              activeTab === "streak"
-                ? "bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
-                : "bg-slate-950/60 border-slate-800 text-slate-500 hover:text-cyan-400"
-            }`}
-          >
-            <Flame className="w-3.5 h-3.5" />
-            КВЕСТЫ
-          </button>
-
-          <button
-            onClick={() => setActiveTab("creed")}
-            className={`py-2 px-1 rounded-lg border text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 transition cursor-pointer ${
-              activeTab === "creed"
-                ? "bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
-                : "bg-slate-950/60 border-slate-800 text-slate-500 hover:text-cyan-400"
-            }`}
-          >
-            <Swords className="w-3.5 h-3.5" />
-            ОХОТА
-          </button>
-
-          <button
-            onClick={() => setActiveTab("level")}
-            className={`py-2 px-1 rounded-lg border text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 transition cursor-pointer ${
-              activeTab === "level"
-                ? "bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
-                : "bg-slate-950/60 border-slate-800 text-slate-500 hover:text-cyan-400"
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            КЛАСС
-          </button>
-
-          <button
-            onClick={() => setActiveTab("elite")}
-            className={`py-2 px-1 rounded-lg border text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 transition cursor-pointer ${
-              activeTab === "elite"
-                ? "bg-purple-500/20 border-purple-400 text-purple-200 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
-                : "bg-slate-950/60 border-slate-800 text-slate-500 hover:text-purple-400"
-            }`}
-          >
-            <Skull className="w-3.5 h-3.5 text-purple-400" />
-            ТЕНИ
-          </button>
-        </div>
-
-        {/* Список ачивок */}
-        <div className="space-y-3 overflow-y-auto pr-2 flex-1 [scrollbar-width:thin] [scrollbar-color:rgba(6,182,212,0.4)_rgba(15,23,42,0.6)]">
-          {filteredAchievements.map((ach, index) => {
-            const isUnlocked = checkUnlocked(ach);
-            const progressText = getCurrentProgress(ach);
-
-            return (
-              <motion.div
-                key={ach.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }}
-                className={`p-3.5 rounded-xl border transition-all ${
-                  isUnlocked
-                    ? ach.category === "elite"
-                      ? "bg-purple-950/40 border-purple-500/60 shadow-[0_0_15px_rgba(168,85,247,0.2)]"
-                      : "bg-cyan-950/40 border-cyan-400/60 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
-                    : "bg-slate-950/60 border-slate-800/80 opacity-60"
-                }`}
-              >
-                <div className="flex items-start justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`p-1.5 rounded-lg border ${
-                        isUnlocked
-                          ? ach.category === "elite"
-                            ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
-                            : "bg-cyan-500/20 border-cyan-400/50 text-cyan-300"
-                          : "bg-slate-900 border-slate-800 text-slate-600"
-                      }`}
-                    >
-                      {isUnlocked ? (
-                        ach.category === "elite" ? (
-                          <Crown className="w-4 h-4 text-purple-300 animate-pulse" />
-                        ) : (
-                          <Flame className="w-4 h-4 fill-cyan-400 text-cyan-300 animate-pulse" />
-                        )
-                      ) : (
-                        <Lock className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div>
-                      <h3
-                        className={`text-xs font-bold tracking-wider ${
-                          isUnlocked
-                            ? ach.category === "elite"
-                              ? "text-purple-200"
-                              : "text-cyan-100"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        {ach.title}
-                      </h3>
-                      <span className="text-[9px] text-cyan-600 font-mono uppercase">
-                        ТРЕБОВАНИЕ: {ach.req}{" "}
-                        {ach.category === "streak"
-                          ? "ДНЕЙ"
-                          : ach.category === "creed"
-                            ? "МИССИЙ"
-                            : ach.category === "level"
-                              ? "LVL"
-                              : "УСЛОВИЕ"}
-                      </span>
-                    </div>
+        {state === "ok" && (
+          <>
+            {/* Общий прогресс */}
+            <section className="border border-purple-500/40 bg-purple-950/20 p-3.5 mb-4 shrink-0">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs text-purple-300 font-bold tracking-wider uppercase flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" />
+                  Уровень синхронизации
+                </span>
+                <span className="text-xs font-black text-purple-200 tracking-widest">
+                  [{unlockedCount}/{ACHIEVEMENTS.length}]
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-950 overflow-hidden p-0.5 border border-purple-500/30">
+                <div
+                  className="h-full bg-purple-500 transition-all duration-500 shadow-[0_0_10px_#a855f7]"
+                  style={{
+                    width: `${(unlockedCount / ACHIEVEMENTS.length) * 100}%`,
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3 text-center text-[10px] tracking-widest text-[#7fa8d6]">
+                <div>
+                  LVL
+                  <div className="text-base font-black text-white">
+                    {stats.level}
                   </div>
+                </div>
+                <div>
+                  СТРИК
+                  <div className="text-base font-black text-white">
+                    {stats.streak}D
+                  </div>
+                </div>
+                <div>
+                  МИССИЙ
+                  <div className="text-base font-black text-white">
+                    {stats.tasks}
+                  </div>
+                </div>
+              </div>
+            </section>
 
-                  <span
-                    className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
-                      isUnlocked
-                        ? ach.category === "elite"
-                          ? "bg-purple-950 text-purple-300 border-purple-500/40"
-                          : "bg-cyan-950 text-cyan-300 border-cyan-500/40"
-                        : "bg-slate-900 text-slate-600 border-slate-800"
+            {/* Вкладки */}
+            <div className="grid grid-cols-4 gap-1.5 mb-4 shrink-0">
+              {TABS.map(({ id, label, Icon, purple }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`py-2 px-1 border text-[10px] font-bold tracking-wider uppercase flex items-center justify-center gap-1 transition cursor-pointer ${
+                    activeTab === id
+                      ? purple
+                        ? "bg-purple-500/20 border-purple-400 text-purple-200 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                        : "bg-[#3b9dff]/20 border-[#3b9dff] text-[#cfe6ff] shadow-[0_0_10px_rgba(59,157,255,0.35)]"
+                      : "bg-slate-950/60 border-slate-800 text-slate-500 hover:text-[#9fd0ff]"
+                  }`}
+                >
+                  <Icon
+                    className={`w-3.5 h-3.5 ${purple ? "text-purple-400" : ""}`}
+                  />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Список достижений */}
+            <div className="space-y-3 overflow-y-auto pr-2 flex-1 [scrollbar-width:thin] [scrollbar-color:rgba(59,157,255,0.4)_rgba(15,23,42,0.6)]">
+              {list.map((ach, index) => {
+                const unlocked = isUnlocked(ach);
+                const elite = ach.category === "elite";
+                return (
+                  <motion.div
+                    key={ach.id}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className={`p-3.5 border transition-all ${
+                      unlocked
+                        ? elite
+                          ? "bg-purple-950/40 border-purple-500/60 shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+                          : "bg-[#3b9dff]/10 border-[#3b9dff]/60 shadow-[0_0_15px_rgba(59,157,255,0.18)]"
+                        : "bg-slate-950/60 border-slate-800/80 opacity-60"
                     }`}
                   >
-                    {isUnlocked ? "ОТКРЫТО" : progressText}
-                  </span>
-                </div>
+                    <div className="flex items-start justify-between mb-1.5 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className={`p-1.5 border shrink-0 ${
+                            unlocked
+                              ? elite
+                                ? "bg-purple-500/20 border-purple-400/50 text-purple-300"
+                                : "bg-[#3b9dff]/20 border-[#3b9dff]/50 text-[#9fd0ff]"
+                              : "bg-slate-900 border-slate-800 text-slate-600"
+                          }`}
+                        >
+                          {unlocked ? (
+                            elite ? (
+                              <Crown className="w-4 h-4 text-purple-300 animate-pulse" />
+                            ) : (
+                              <Flame className="w-4 h-4 text-[#9fd0ff] animate-pulse" />
+                            )
+                          ) : (
+                            <Lock className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3
+                            className={`text-xs font-bold tracking-wider ${
+                              unlocked
+                                ? elite
+                                  ? "text-purple-200"
+                                  : "text-[#e3f0ff]"
+                                : "text-slate-500"
+                            }`}
+                          >
+                            {ach.title}
+                          </h3>
+                          <span className="text-[9px] text-[#5f86b3] uppercase">
+                            ТРЕБОВАНИЕ: {ach.req} {unitLabel(ach)}
+                          </span>
+                        </div>
+                      </div>
 
-                <p className="text-[10px] text-slate-400 pl-8">{ach.desc}</p>
-              </motion.div>
-            );
-          })}
-        </div>
-      </main>
+                      <span
+                        className={`text-[9px] px-2 py-0.5 border shrink-0 ${
+                          unlocked
+                            ? elite
+                              ? "bg-purple-950 text-purple-300 border-purple-500/40"
+                              : "bg-[#3b9dff]/15 text-[#9fd0ff] border-[#3b9dff]/40"
+                            : "bg-slate-900 text-slate-600 border-slate-800"
+                        }`}
+                      >
+                        [{unlocked ? "ОТКРЫТО" : progressText(ach)}]
+                      </span>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 pl-8">
+                      {ach.desc}
+                    </p>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </SystemFrame>
     </div>
   );
 }

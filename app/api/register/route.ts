@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { setSession } from "@/lib/session";
+import { authIdFor, privatePlayer } from "@/lib/player";
 
 function hasCode(error: unknown, code: string) {
   return (
@@ -43,12 +45,12 @@ export async function POST(req: Request) {
       data: { nickname, passwordHash },
     });
 
+    await setSession(player.id);
+
     return NextResponse.json({
       status: "ok",
-      account: {
-        name: player.nickname,
-        authId: "ID-" + player.id.slice(0, 8).toUpperCase(),
-      },
+      account: { name: player.nickname, authId: authIdFor(player.id) },
+      player: privatePlayer(player),
     });
   } catch (error) {
     if (hasCode(error, "P2002")) {
@@ -57,10 +59,13 @@ export async function POST(req: Request) {
         { status: 409 }
       );
     }
-    console.error(error);
-    return NextResponse.json(
-      { error: "ОШИБКА СИСТЕМЫ СОХРАНЕНИЯ" },
-      { status: 500 }
+return NextResponse.json(
+  {
+    error: "ОШИБКА СИСТЕМЫ СОХРАНЕНИЯ",
+    debug:
+      process.env.NODE_ENV !== "production" ? String(error) : undefined,
+  },
+  { status: 500 }
     );
   }
 }
