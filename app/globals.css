@@ -22,65 +22,22 @@
 }
 
 /* Подключите этот файл в app/layout.jsx:  import "./system.css"; */
-
-:root {
-    color-scheme: dark;
+.clip-path-sci {
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
 }
 
-html,
-body {
-    background: #000;
-    overscroll-behavior-y: none;
-}
-
-body {
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Скроллбар в стиле интерфейса Системы */
-.custom-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(6, 182, 212, 0.5) transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(6, 182, 212, 0.45);
-    border-radius: 999px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(34, 211, 238, 0.8);
-}
-
-/* Видимый фокус с клавиатуры */
-:where(button, a, input):focus-visible {
-    outline: 2px solid #22d3ee;
-    outline-offset: 2px;
-    border-radius: 8px;
-}
-
-/* Текст интерфейса не выделяется при быстрых тапах, ввод — выделяется */
-input,
-textarea {
-    user-select: text;
-}
-
-@media (prefers-reduced-motion: reduce) {
-
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
     }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.15s ease-out forwards;
 }
