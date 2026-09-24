@@ -774,35 +774,56 @@ export default function HomePage() {
     const t = TONES[tone];
 
     return (
-      <motion.div
-        initial={animConfig.initial}
-        animate={animConfig.animate}
-        exit={{ opacity: 0, scale: 0.7, y: -20 }}
-        transition={animConfig.transition}
-      >
-        <SystemFrame tone={tone} className="p-3 flex items-center gap-3">
-          <IconBox tone={tone}>
-            <Sparkles className="w-5 h-5" />
-          </IconBox>
-          <div className="flex-1 min-w-0 relative">
-            <div
-              className="text-[9px] font-black tracking-[0.25em] uppercase"
-              style={{ color: t.main }}
-            >
-              УВЕДОМЛЕНИЕ // ДОСТИЖЕНИЕ
+      <div className="relative">
+        <motion.div
+          aria-hidden
+          initial={{ opacity: 0.9, scale: 0.4 }}
+          animate={{ opacity: 0, scale: 2.4 }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className="pointer-events-none absolute inset-0 rounded-full"
+          style={{
+            background: `radial-gradient(circle, rgba(${t.glow},0.55), transparent 65%)`,
+          }}
+        />
+        <motion.div
+          initial={animConfig.initial}
+          animate={animConfig.animate}
+          exit={{ opacity: 0, scale: 0.7, y: -20 }}
+          transition={animConfig.transition}
+          className="relative"
+        >
+          <SystemFrame
+            tone={tone}
+            className="p-3 flex items-center gap-3"
+            style={{
+              boxShadow: `0 0 10px rgba(${t.glow},0.32), 0 0 30px rgba(${t.glow},0.35), inset 0 0 22px rgba(${t.glow},0.05)`,
+            }}
+          >
+            <IconBox tone={tone}>
+              <Sparkles className="w-5 h-5" />
+            </IconBox>
+            <div className="flex-1 min-w-0 relative">
+              <div
+                className="text-[9px] font-black tracking-[0.25em] uppercase"
+                style={{ color: t.main }}
+              >
+                УВЕДОМЛЕНИЕ // ДОСТИЖЕНИЕ
+              </div>
+              <h3
+                className="text-sm font-black text-white tracking-wide truncate"
+                style={{
+                  textShadow: `0 0 8px ${t.main}, 0 0 18px rgba(${t.glow},0.6)`,
+                }}
+              >
+                {ach.title}
+              </h3>
+              <p className="text-[10px] text-slate-300 truncate">
+                {ach.description}
+              </p>
             </div>
-            <h3
-              className="text-sm font-black text-white tracking-wide truncate"
-              style={{ textShadow: `0 0 8px ${t.main}` }}
-            >
-              {ach.title}
-            </h3>
-            <p className="text-[10px] text-slate-300 truncate">
-              {ach.description}
-            </p>
-          </div>
-        </SystemFrame>
-      </motion.div>
+          </SystemFrame>
+        </motion.div>
+      </div>
     );
   };
 
@@ -996,12 +1017,44 @@ export default function HomePage() {
                   {/* Статус развития */}
                   <section className="mb-5">
                     <SysSubtitle>СТАТУС РАЗВИТИЯ</SysSubtitle>
-                    <div className="mt-3 space-y-1.5">
-                      <SysRow label="Уровень" value={`LVL ${level}`} done />
-                      <SysRow label="Ранг" value={hunterRankInfo.rank} done />
+                    <div className="mt-3 flex items-center gap-3">
+                      <div
+                        className="shrink-0 flex flex-col items-center justify-center w-16 h-16 border"
+                        style={{
+                          borderColor: "rgba(94,203,255,0.5)",
+                          background: "rgba(94,203,255,0.06)",
+                          boxShadow: "0 0 10px rgba(94,203,255,0.3)",
+                        }}
+                      >
+                        <span className="text-[8px] tracking-widest text-[#7fa8d6] uppercase">
+                          LVL
+                        </span>
+                        <span
+                          className="sys-title text-3xl leading-none text-white"
+                          style={{
+                            textShadow:
+                              "0 0 6px #5ecbff, 0 0 16px rgba(94,203,255,0.6)",
+                          }}
+                        >
+                          {level}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[9px] tracking-[0.2em] text-[#7fa8d6] uppercase">
+                          Ранг
+                        </div>
+                        <div
+                          className="sys-title text-lg text-white truncate"
+                          style={{ textShadow: "0 0 4px rgba(94,203,255,0.5)" }}
+                        >
+                          {hunterRankInfo.rank}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3">
                       <SysRow label="Опыт" value={`${xp}/${xpPerLevel} XP`} />
                     </div>
-                    <div className="mt-3 h-2.5 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
+                    <div className="mt-2 h-2.5 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
                       <div
                         className="h-full transition-all duration-500"
                         style={{
@@ -1157,10 +1210,27 @@ export default function HomePage() {
                           tasks.map((task) => (
                             <motion.div
                               key={task.id}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
+                              layout
+                              initial={{
+                                opacity: 0,
+                                x: -20,
+                                boxShadow: "0 0 0px rgba(94,203,255,0)",
+                              }}
+                              animate={{
+                                opacity: 1,
+                                x: 0,
+                                boxShadow: [
+                                  "0 0 16px rgba(94,203,255,0.6)",
+                                  "0 0 0px rgba(94,203,255,0)",
+                                ],
+                              }}
                               exit={{ opacity: 0, x: 20 }}
-                              className="flex items-start gap-2"
+                              transition={{ duration: 0.7, ease: "easeOut" }}
+                              className={`flex items-start gap-2 border px-2.5 py-2 ${
+                                task.completed
+                                  ? "border-emerald-400/30 bg-emerald-400/5"
+                                  : "border-[#5ecbff]/25 bg-[#5ecbff]/[0.04]"
+                              }`}
                             >
                               <div
                                 role="button"

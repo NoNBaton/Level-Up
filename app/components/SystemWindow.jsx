@@ -94,6 +94,7 @@ export function SystemFrame({
   className = "",
   outer = false,
   glass = false,
+  style,
   children,
 }) {
   const t = TONES[tone] || TONES.blue;
@@ -110,6 +111,7 @@ export function SystemFrame({
         border: `1.5px solid ${t.main}`,
         boxShadow: `0 0 10px rgba(${t.glow},0.32), inset 0 0 22px rgba(${t.glow},0.05)`,
         backdropFilter: glass ? "blur(3px)" : "none",
+        ...style,
       }}
     >
       <SysStyles />
