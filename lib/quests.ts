@@ -6,7 +6,17 @@ export const CATEGORY_META = {
   sport: { label: "СПОРТ", icon: "Dumbbell" },
   study: { label: "УЧЁБА", icon: "BookOpen" },
 };
+type QuestDef = {
+  id: string;
+  category: "sport" | "study";
+  base: number;
+  step: number;
+  cap: number;
+  isFloat?: boolean;
+  text: (n: number) => string;
+};
 
+export const QUEST_DEFS: QuestDef[] = [
 export const QUEST_DEFS = [
   {
     id: "sport_pushups",
@@ -42,14 +52,13 @@ export const QUEST_DEFS = [
     text: (n) => `Прочитай ${n} страниц`,
   },
 ];
-
-export function questAmount(def, streak) {
+export function questAmount(def: QuestDef, streak: number) {
   const raw = def.base + def.step * Math.max(0, streak);
   const capped = Math.min(def.cap, raw);
   return def.isFloat ? Math.round(capped * 10) / 10 : Math.round(capped);
 }
 
-export function generateDailyQuests(streak) {
+export function generateDailyQuests(streak: number) {
   return QUEST_DEFS.map((def) => ({
     id: def.id,
     category: def.category,
@@ -58,7 +67,7 @@ export function generateDailyQuests(streak) {
   }));
 }
 
-export function getWeekMonday(d = new Date()) {
+export function getWeekMonday(d: Date = new Date()) {
   const date = new Date(d);
   const day = date.getDay();
   const diff = (day === 0 ? -6 : 1) - day;
@@ -74,7 +83,7 @@ export const BOSS_THEMES = [
   "КОШМАР СИСТЕМЫ",
 ];
 
-export function bossThemeForWeek(weekStart) {
+export function bossThemeForWeek(weekStart: string) {
   let hash = 0;
   for (let i = 0; i < weekStart.length; i++) {
     hash = (hash * 31 + weekStart.charCodeAt(i)) >>> 0;
@@ -82,7 +91,7 @@ export function bossThemeForWeek(weekStart) {
   return BOSS_THEMES[hash % BOSS_THEMES.length];
 }
 
-export function freshBoss(weekStart) {
+export function freshBoss(weekStart: string) {
   return {
     weekStart,
     hp: BOSS_MAX_HP,
