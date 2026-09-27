@@ -8,19 +8,24 @@ datasource db {
 }
 
 model Player {
-  id           String   @id @default(uuid())
-  nickname     String   @unique
-  passwordHash String
-  level        Int      @default(1)
-  xp           Int      @default(0)
-  streak       Int      @default(0)
-  rank         String   @default("E-РАНГ")
-  bio          String   @default("")
-  avatar       String   @default("cyan")
-  achievements String[] @default([])
-  progress     Json     @default("{}")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
+  id                  String    @id @default(uuid())
+  nickname            String    @unique
+  passwordHash        String
+  level               Int       @default(1)
+  xp                  Int       @default(0)
+  streak              Int       @default(0)
+  rank                String    @default("E-РАНГ")
+  bio                 String    @default("")
+  avatar              String    @default("cyan")
+  achievements        String[]  @default([])
+  progress            Json      @default("{}")
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  recoveryQuestion    String    @default("")
+  recoveryAnswerHash  String    @default("")
+  lastProgressAt      DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
 
   @@index([level, xp])
 }

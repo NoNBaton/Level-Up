@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   Lock,
+  Skull,
 } from "lucide-react";
 
 export const AVATAR_STYLES = {
@@ -51,6 +52,11 @@ const ACH_META = {
     title: "ДЕНЬ ЗАКРЫТ",
     desc: "100% за день",
     Icon: CheckCircle2,
+  },
+  boss_defeated: {
+    title: "ОХОТНИК НА БОССОВ",
+    desc: "Босс недели повержен",
+    Icon: Skull,
   },
 };
 

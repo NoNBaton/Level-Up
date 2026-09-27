@@ -1,15 +1,12 @@
 "use client";
-
+import { sfx } from "./lib/sounds";
 import React, { useState, useEffect, useRef } from "react";
+
 import {
   Plus,
-  Check,
   Trash2,
   Flame,
-  Terminal,
-  Cpu,
   Award,
-  Calendar,
   CheckCircle2,
   ShieldCheck,
   Power,
@@ -19,11 +16,14 @@ import {
   Trophy,
   Star,
   User,
-  ShieldAlert,
   LogOut,
+  Dumbbell,
+  BookOpen,
+  Skull,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import BootScreen from "./components/BootScreen";
 import SystemWindow, {
   SystemFrame,
   SysSubtitle,
@@ -35,6 +35,16 @@ import SystemWindow, {
   TONES,
 } from "./components/SystemWindow";
 
+import RecoveryModal from "./components/RecoveryModal";
+import { RECOVERY_QUESTIONS } from "@/lib/player";
+import {
+  generateDailyQuests,
+  getWeekMonday,
+  freshBoss,
+  BOSS_DAMAGE_PER_QUEST,
+  PENALTY_XP,
+  CATEGORY_META,
+} from "@/lib/quests";
 const SOUNDS = {
   openModal: "/sounds/open.mp3",
   closeModal: "/sounds/close.mp3",
@@ -132,37 +142,12 @@ const readLegacyLocal = (authId) => {
 };
 
 const getHunterRank = (lvl) => {
-  if (lvl >= 25)
-    return {
-      rank: "S-РАНГ",
-      color:
-        "text-fuchsia-400 border-fuchsia-400 bg-fuchsia-950/40 shadow-[0_0_15px_rgba(217,70,239,0.5)]",
-    };
-  if (lvl >= 20)
-    return {
-      rank: "A-РАНГ",
-      color:
-        "text-amber-300 border-amber-400 bg-amber-950/40 shadow-[0_0_15px_rgba(251,191,36,0.4)]",
-    };
-  if (lvl >= 15)
-    return {
-      rank: "B-РАНГ",
-      color: "text-purple-300 border-purple-400 bg-purple-950/40",
-    };
-  if (lvl >= 10)
-    return {
-      rank: "C-РАНГ",
-      color: "text-blue-300 border-blue-400 bg-blue-950/40",
-    };
-  if (lvl >= 5)
-    return {
-      rank: "D-РАНГ",
-      color: "text-cyan-300 border-cyan-400 bg-cyan-950/40",
-    };
-  return {
-    rank: "E-РАНГ",
-    color: "text-slate-300 border-slate-500 bg-slate-900/60",
-  };
+  if (lvl >= 25) return { rank: "S-РАНГ" };
+  if (lvl >= 20) return { rank: "A-РАНГ" };
+  if (lvl >= 15) return { rank: "B-РАНГ" };
+  if (lvl >= 10) return { rank: "C-РАНГ" };
+  if (lvl >= 5) return { rank: "D-РАНГ" };
+  return { rank: "E-РАНГ" };
 };
 
 const ACHIEVEMENTS_LIST = {
@@ -170,7 +155,6 @@ const ACHIEVEMENTS_LIST = {
     id: "first_task",
     title: "ПЕРВЫЙ ШАГ",
     description: "Выполнена первая миссия!",
-    icon: <Zap className="w-6 h-6 text-cyan-300" />,
     rarity: "common",
     animationType: "zap",
   },
@@ -178,7 +162,6 @@ const ACHIEVEMENTS_LIST = {
     id: "streak_3",
     title: "НАБИРАЯ ХОД",
     description: "3 дня продуктивности подряд!",
-    icon: <Flame className="w-6 h-6 text-amber-300" />,
     rarity: "epic",
     animationType: "streak_pulse",
   },
@@ -186,7 +169,6 @@ const ACHIEVEMENTS_LIST = {
     id: "streak_7",
     title: "КИБЕР-ВОИН",
     description: "Недельный стрик удерживается!",
-    icon: <ShieldCheck className="w-6 h-6 text-amber-300" />,
     rarity: "epic",
     animationType: "streak_pulse",
   },
@@ -194,7 +176,6 @@ const ACHIEVEMENTS_LIST = {
     id: "streak_30",
     title: "ЛЕГЕНДА СИСТЕМЫ",
     description: "30 дней беспрерывного прогресса!",
-    icon: <Crown className="w-6 h-6 text-fuchsia-300" />,
     rarity: "legendary",
     animationType: "legendary_storm",
   },
@@ -202,7 +183,6 @@ const ACHIEVEMENTS_LIST = {
     id: "level_5",
     title: "ВЕТЕРАН КОДА",
     description: "Достигнут D-ранг (5 уровень)!",
-    icon: <Star className="w-6 h-6 text-amber-300" />,
     rarity: "epic",
     animationType: "level_spin",
   },
@@ -210,7 +190,6 @@ const ACHIEVEMENTS_LIST = {
     id: "level_25",
     title: "ПОВЕЛИТЕЛЬ СИСТЕМЫ",
     description: "Достигнут S-ранг (25 уровень)! Пик силы!",
-    icon: <Trophy className="w-6 h-6 text-fuchsia-200" />,
     rarity: "legendary",
     animationType: "legendary_storm",
   },
@@ -218,9 +197,15 @@ const ACHIEVEMENTS_LIST = {
     id: "day_complete",
     title: "ДЕНЬ ЗАКРЫТ",
     description: "Все задачи на сегодня выполнены на 100%!",
-    icon: <CheckCircle2 className="w-6 h-6 text-cyan-300" />,
     rarity: "common",
     animationType: "matrix_stamp",
+  },
+  BOSS_DEFEATED: {
+    id: "boss_defeated",
+    title: "ОХОТНИК НА БОССОВ",
+    description: "Недельный босс повержен!",
+    rarity: "legendary",
+    animationType: "legendary_storm",
   },
 };
 
@@ -275,7 +260,9 @@ export default function HomePage() {
   const [authConfirm, setAuthConfirm] = useState("");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-
+  const [authQuestion, setAuthQuestion] = useState(RECOVERY_QUESTIONS[0]);
+  const [authAnswer, setAuthAnswer] = useState("");
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   // Игровое состояние
   const [level, setLevel] = useState(1);
   const [xp, setXp] = useState(0);
@@ -283,11 +270,15 @@ export default function HomePage() {
   const [lastCompletedDate, setLastCompletedDate] = useState("");
   const [completedTotal, setCompletedTotal] = useState(0);
   const [tasks, setTasks] = useState([]);
+  const [dailyQuests, setDailyQuests] = useState([]);
+  const [boss, setBoss] = useState(null);
   const [history, setHistory] = useState([]);
   const [unlockedAchievements, setUnlockedAchievements] = useState([]);
   const [newTaskText, setNewTaskText] = useState("");
 
   const [isLoaded, setIsLoaded] = useState(false);
+  const [bootPhase, setBootPhase] = useState("loading"); // loading | poweron | done
+  const bootStartRef = useRef(Date.now());
   const [syncState, setSyncState] = useState("idle"); // idle | saving | saved | error
 
   const loadedFor = useRef(null);
@@ -302,17 +293,34 @@ export default function HomePage() {
   const [unlockedAchievementNotification, setUnlockedAchievementNotification] =
     useState(null);
 
-  const playSound = (soundUrl) => {
+  const playSound = (key) => {
     try {
-      if (typeof window !== "undefined") {
-        const audio = new Audio(soundUrl);
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
-      }
+      const map = {
+        [SOUNDS.openModal]: sfx.open,
+        [SOUNDS.closeModal]: sfx.close,
+        [SOUNDS.addMission]: sfx.addMission,
+        [SOUNDS.completeTask]: sfx.completeTask,
+        [SOUNDS.achievement]: sfx.achievement,
+        [SOUNDS.epicAchievement]: sfx.epicAchievement,
+      };
+      (map[key] || sfx.click)();
     } catch {
       // ignore
     }
-  };
+  }; // ---------- Экран загрузки: минимум показывается 1.1с, потом «включение» ----------
+  useEffect(() => {
+    if (!isLoaded || bootPhase !== "loading") return;
+    const elapsed = Date.now() - bootStartRef.current;
+    const wait = Math.max(0, 1100 - elapsed);
+    const t = setTimeout(() => setBootPhase("poweron"), wait);
+    return () => clearTimeout(t);
+  }, [isLoaded, bootPhase]);
+
+  useEffect(() => {
+    if (bootPhase !== "poweron") return;
+    const t = setTimeout(() => setBootPhase("done"), 1300);
+    return () => clearTimeout(t);
+  }, [bootPhase]);
 
   // ---------- Загрузка / сброс состояния ----------
 
@@ -323,7 +331,6 @@ export default function HomePage() {
       typeof player.progress === "object" &&
       typeof player.progress.date === "string";
 
-    // Новый аккаунт без прогресса на сервере: переносим старый из браузера
     if (
       !hasServerProgress &&
       player.level === 1 &&
@@ -365,7 +372,6 @@ export default function HomePage() {
       ? src.achievements
       : [];
 
-    // Общее число выполненных миссий: берём сохранённое, иначе считаем по истории
     const total = Number.isFinite(prog.completedTotal)
       ? Math.max(0, Math.floor(prog.completedTotal))
       : loadedHistory
@@ -373,13 +379,44 @@ export default function HomePage() {
           .reduce((sum, h) => sum + (Number(h.completed) || 0), 0) +
         loadedTasks.filter((t) => t.completed).length;
 
+    // Ежедневные авто-квесты + штраф за пропущенный день
+    const savedQuestsDate =
+      typeof prog.dailyQuestsDate === "string" && prog.dailyQuestsDate
+        ? prog.dailyQuestsDate
+        : "";
+    let loadedDailyQuests = Array.isArray(prog.dailyQuests)
+      ? prog.dailyQuests
+      : [];
+    let xpFromSrc = Number(src.xp) || 0;
+    let streakFromSrc = streakAlive ? Number(src.streak) || 0 : 0;
+
+    if (savedQuestsDate !== today || loadedDailyQuests.length === 0) {
+      const hadQuests =
+        savedQuestsDate !== today && loadedDailyQuests.length > 0;
+      const allDone = hadQuests && loadedDailyQuests.every((q) => q.completed);
+      if (hadQuests && !allDone) {
+        xpFromSrc = Math.max(0, xpFromSrc - PENALTY_XP);
+        streakFromSrc = 0;
+      }
+      loadedDailyQuests = generateDailyQuests(streakFromSrc);
+    } // Босс недели
+    const weekStart = getWeekMonday();
+    const savedBoss =
+      prog.boss && typeof prog.boss === "object" ? prog.boss : null;
+    const loadedBoss =
+      savedBoss && savedBoss.weekStart === weekStart
+        ? savedBoss
+        : freshBoss(weekStart);
+
     unlockedRef.current = achievements;
     setLevel(Number(src.level) || 1);
-    setXp(Number(src.xp) || 0);
-    setStreak(streakAlive ? Number(src.streak) || 0 : 0);
+    setXp(xpFromSrc);
+    setStreak(streakFromSrc);
     setLastCompletedDate(last);
     setCompletedTotal(total);
     setTasks(loadedTasks);
+    setDailyQuests(loadedDailyQuests);
+    setBoss(loadedBoss);
     setUnlockedAchievements(achievements);
     setHistory(generate7DaysHistory(loadedHistory, loadedTasks));
   };
@@ -396,6 +433,8 @@ export default function HomePage() {
     setLastCompletedDate("");
     setCompletedTotal(0);
     setTasks([]);
+    setDailyQuests([]);
+    setBoss(null);
     setHistory(generate7DaysHistory([], []));
     setUnlockedAchievements([]);
     setSyncState("idle");
@@ -458,6 +497,9 @@ export default function HomePage() {
       lastCompletedDate,
       completedTotal,
       tasks,
+      dailyQuests,
+      dailyQuestsDate: getTodayString(),
+      boss,
       history: history.map(({ date, completed, total, tasksSnapshot }) => ({
         date,
         completed,
@@ -512,6 +554,8 @@ export default function HomePage() {
     lastCompletedDate,
     completedTotal,
     tasks,
+    dailyQuests,
+    boss,
     history,
     unlockedAchievements,
     profile,
@@ -557,6 +601,10 @@ export default function HomePage() {
       setAuthError("КОДЫ ДОСТУПА НЕ СОВПАДАЮТ");
       return;
     }
+    if (authMode === "register" && authAnswer.trim().length < 2) {
+      setAuthError("ОТВЕТ НА СЕКРЕТНЫЙ ВОПРОС — МИНИМУМ 2 СИМВОЛА");
+      return;
+    }
 
     setAuthLoading(true);
     setAuthError("");
@@ -567,7 +615,16 @@ export default function HomePage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nickname: name, password: authPass }),
+          body: JSON.stringify(
+            authMode === "register"
+              ? {
+                  nickname: name,
+                  password: authPass,
+                  recoveryQuestion: authQuestion,
+                  recoveryAnswer: authAnswer,
+                }
+              : { nickname: name, password: authPass },
+          ),
         },
       );
       const data = await res.json().catch(() => ({}));
@@ -585,6 +642,7 @@ export default function HomePage() {
       setAuthName("");
       setAuthPass("");
       setAuthConfirm("");
+      setAuthAnswer("");
       setAuthMode("login");
       playSound(SOUNDS.openModal);
     } catch {
@@ -633,7 +691,6 @@ export default function HomePage() {
     setTimeout(() => setUnlockedAchievementNotification(null), 5500);
   };
 
-  // Меняет XP и уровень одним пересчётом (delta может быть отрицательной)
   const changeXp = (delta) => {
     let newXp = xp + delta;
     let newLevel = level;
@@ -725,7 +782,39 @@ export default function HomePage() {
       setCompletedTotal((c) => Math.max(0, c - 1));
     }
   };
+  const toggleDailyQuest = (id) => {
+    const quest = dailyQuests.find((q) => q.id === id);
+    if (!quest) return;
 
+    const isNowCompleted = !quest.completed;
+    setDailyQuests((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, completed: isNowCompleted } : q)),
+    );
+
+    if (isNowCompleted) {
+      playSound(SOUNDS.completeTask);
+      changeXp(xpPerTask);
+      setCompletedTotal((c) => c + 1);
+      triggerAchievement("FIRST_TASK");
+      bumpStreak();
+      setBoss((prev) => {
+        if (!prev) return prev;
+        const hp = Math.max(0, prev.hp - BOSS_DAMAGE_PER_QUEST);
+        const justDefeated = hp === 0 && !prev.defeated;
+        if (justDefeated) triggerAchievement("BOSS_DEFEATED");
+        return { ...prev, hp, defeated: prev.defeated || hp === 0 };
+      });
+    } else {
+      playSound(SOUNDS.closeModal);
+      changeXp(-xpPerTask);
+      setCompletedTotal((c) => Math.max(0, c - 1));
+      setBoss((prev) => {
+        if (!prev) return prev;
+        const hp = Math.min(prev.maxHp, prev.hp + BOSS_DAMAGE_PER_QUEST);
+        return { ...prev, hp, defeated: hp === 0 ? prev.defeated : false };
+      });
+    }
+  };
   const handleFinishDay = () => {
     const uncompleted = tasks.filter((t) => !t.completed);
     if (uncompleted.length > 0) {
@@ -748,17 +837,8 @@ export default function HomePage() {
 
   // ---------- Отрисовка ----------
 
-  if (!isLoaded) {
-    return (
-      <div className="min-h-[100dvh] bg-black text-cyan-400 font-mono flex justify-center items-center p-4">
-        <div className="flex items-center gap-2 border border-cyan-500/50 p-3 rounded-xl bg-cyan-950/20 backdrop-blur">
-          <Cpu className="w-5 h-5 animate-spin text-cyan-400" />
-          <span className="text-xs tracking-[0.2em] uppercase animate-pulse">
-            СИНХРОНИЗАЦИЯ СИСТЕМЫ...
-          </span>
-        </div>
-      </div>
-    );
+  if (bootPhase !== "done") {
+    return <BootScreen powerOn={bootPhase === "poweron"} />;
   }
 
   // Уведомление о достижении в стиле системного окна
@@ -792,13 +872,7 @@ export default function HomePage() {
           transition={animConfig.transition}
           className="relative"
         >
-          <SystemFrame
-            tone={tone}
-            className="p-3 flex items-center gap-3"
-            style={{
-              boxShadow: `0 0 10px rgba(${t.glow},0.32), 0 0 30px rgba(${t.glow},0.35), inset 0 0 22px rgba(${t.glow},0.05)`,
-            }}
-          >
+          <SystemFrame tone={tone} className="p-3 flex items-center gap-3">
             <IconBox tone={tone}>
               <Sparkles className="w-5 h-5" />
             </IconBox>
@@ -852,7 +926,6 @@ export default function HomePage() {
               ? "Введите позывной и код доступа."
               : "Создайте позывной и код доступа."}
           </div>
-
           <SysInput
             type="text"
             value={authName}
@@ -876,24 +949,44 @@ export default function HomePage() {
             }
           />
           {authMode === "register" && (
-            <SysInput
-              type="password"
-              value={authConfirm}
-              onChange={(e) => {
-                setAuthConfirm(e.target.value);
-                if (authError) setAuthError("");
-              }}
-              placeholder="Повторите код доступа..."
-              autoComplete="new-password"
-            />
+            <>
+              <SysInput
+                type="password"
+                value={authConfirm}
+                onChange={(e) => {
+                  setAuthConfirm(e.target.value);
+                  if (authError) setAuthError("");
+                }}
+                placeholder="Повторите код доступа..."
+                autoComplete="new-password"
+              />
+              <select
+                value={authQuestion}
+                onChange={(e) => setAuthQuestion(e.target.value)}
+                className="w-full bg-[#020817]/60 border border-[#d6e8ff]/40 text-[#e6f1ff] p-3 text-sm outline-none focus:border-[#3b9dff]"
+              >
+                {RECOVERY_QUESTIONS.map((q) => (
+                  <option key={q} value={q} className="bg-[#020817] text-white">
+                    {q}
+                  </option>
+                ))}
+              </select>
+              <SysInput
+                type="text"
+                value={authAnswer}
+                onChange={(e) => {
+                  setAuthAnswer(e.target.value);
+                  if (authError) setAuthError("");
+                }}
+                placeholder="Ваш ответ (для восстановления доступа)..."
+              />
+            </>
           )}
-
           {authError && (
             <div className="text-xs text-rose-300 bg-rose-950/40 border border-rose-500/50 p-2.5 tracking-wider">
               {authError}
             </div>
           )}
-
           <SysButton type="submit" disabled={authLoading} className="w-full">
             {authLoading
               ? "ОБРАБОТКА..."
@@ -901,13 +994,13 @@ export default function HomePage() {
                 ? "[ ПОДТВЕРДИТЬ ВХОД ]"
                 : "[ СОЗДАТЬ АККАУНТ ]"}
           </SysButton>
-
           <button
             type="button"
             onClick={() => {
               setAuthMode(authMode === "login" ? "register" : "login");
               setAuthError("");
               setAuthConfirm("");
+              setAuthAnswer("");
             }}
             className="block mx-auto pt-1 text-[11px] text-[#7fa8d6] underline hover:text-white cursor-pointer"
           >
@@ -915,9 +1008,22 @@ export default function HomePage() {
               ? "// НЕТ АККАУНТА? ЗАРЕГИСТРИРОВАТЬСЯ"
               : "// УЖЕ ЕСТЬ АККАУНТ? ВОЙТИ"}
           </button>
+          {authMode === "login" && (
+            <button
+              type="button"
+              onClick={() => setRecoveryOpen(true)}
+              className="block mx-auto pt-2 text-[10px] text-[#5f86b3] underline hover:text-[#9fd0ff] cursor-pointer"
+            >
+              ЗАБЫЛИ КОД ДОСТУПА?
+            </button>
+          )}{" "}
         </form>
       </SystemWindow>
-
+      <RecoveryModal
+        open={recoveryOpen}
+        onClose={() => setRecoveryOpen(false)}
+        z="z-[110]"
+      />
       {/* Уведомление о достижении */}
       <AnimatePresence mode="wait">
         {unlockedAchievementNotification && (
@@ -927,348 +1033,424 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      <SystemFrame
-        tone="blue"
-        className="w-full max-w-md p-4 sm:p-6 relative z-10 overflow-hidden my-auto flex flex-col justify-between"
-      >
-        {" "}
-        <div className="relative z-10 w-full max-w-md my-auto py-8">
-          <div className="sys-float-soft">
-            <div className="sys-flicker">
-              <div className="sys-glow">
-                <SystemFrame
-                  tone="blue"
-                  glass
-                  outer
-                  className="p-4 sm:p-6 flex flex-col"
-                >
-                  {/* Шапка */}
-                  <header className="relative flex items-stretch gap-3 pt-2 mb-3">
-                    <IconBox tone="blue">!</IconBox>
-                    <div className="flex-1 min-w-0 border border-[#5ecbff]/40 flex items-center justify-center px-2 py-2">
-                      <h1
-                        className="sys-title uppercase tracking-[0.08em] text-base sm:text-lg text-white truncate"
-                        style={{
-                          textShadow:
-                            "0 0 5px #5ecbff, 0 0 12px rgba(94,203,255,0.55)",
-                        }}
-                      >
-                        LEVEL_UP // OS
-                      </h1>
-                    </div>
-                    <div
-                      className="shrink-0 flex items-center gap-1.5 border px-2.5 text-xs font-bold"
+      {/* Главная панель */}
+      <div className="relative z-10 w-full max-w-md my-auto py-8">
+        <div className="sys-float-soft">
+          <div className="sys-flicker">
+            <div className="sys-glow">
+              <SystemFrame
+                tone="blue"
+                glass
+                outer
+                className="p-4 sm:p-6 flex flex-col"
+              >
+                {/* Шапка */}
+                <header className="relative flex items-stretch gap-3 pt-2 mb-3">
+                  <IconBox tone="blue">!</IconBox>
+                  <div className="flex-1 min-w-0 border border-[#5ecbff]/40 flex items-center justify-center px-2 py-2">
+                    <h1
+                      className="sys-title uppercase tracking-[0.08em] text-base sm:text-lg text-white truncate"
                       style={{
-                        borderColor:
-                          streak > 0
-                            ? "rgba(94,203,255,0.8)"
-                            : "rgba(214,232,255,0.25)",
-                        color: streak > 0 ? "#e6f1ff" : "#64748b",
-                        boxShadow:
-                          streak > 0 ? "0 0 12px rgba(94,203,255,0.5)" : "none",
+                        textShadow:
+                          "0 0 5px #5ecbff, 0 0 12px rgba(94,203,255,0.55)",
                       }}
                     >
-                      <span
-                        title={
-                          syncState === "error"
-                            ? "Ошибка синхронизации"
-                            : syncState === "saving"
-                              ? "Сохранение..."
-                              : "Синхронизировано"
-                        }
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          syncState === "error"
-                            ? "bg-red-500"
-                            : syncState === "saving"
-                              ? "bg-amber-400 animate-pulse"
-                              : "bg-emerald-400"
-                        }`}
-                      />
-                      <Flame
-                        className={`w-4 h-4 ${streak > 0 ? "text-[#9fd0ff] animate-pulse" : "text-slate-600"}`}
-                      />
-                      <span className="tracking-widest">{streak}D</span>
-                    </div>
-                  </header>
-
-                  {/* Профиль и выход */}
-                  <div className="flex items-center justify-between gap-3 mb-5 pb-3 border-b border-[#5ecbff]/20 text-[10px] tracking-widest uppercase">
-                    <Link
-                      href="/profile"
-                      className="flex items-center gap-1 min-w-0 text-[#9fd0ff] hover:text-white transition"
-                    >
-                      <User className="w-3 h-3 shrink-0" />
-                      <span className="truncate">
-                        {profile
-                          ? `${profile.name} [${profile.authId}]`
-                          : "ОПЕРАТОР"}
-                      </span>
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      title="Выйти из системы"
-                      className="shrink-0 flex items-center gap-1 text-rose-300/80 hover:text-rose-300 transition cursor-pointer"
-                    >
-                      <LogOut className="w-3 h-3" />
-                      ВЫХОД
-                    </button>
+                      LEVEL_UP // OS
+                    </h1>
                   </div>
+                  <div
+                    className="shrink-0 flex items-center gap-1.5 border px-2.5 text-xs font-bold"
+                    style={{
+                      borderColor:
+                        streak > 0
+                          ? "rgba(94,203,255,0.8)"
+                          : "rgba(214,232,255,0.25)",
+                      color: streak > 0 ? "#e6f1ff" : "#64748b",
+                      boxShadow:
+                        streak > 0 ? "0 0 12px rgba(94,203,255,0.5)" : "none",
+                    }}
+                  >
+                    <span
+                      title={
+                        syncState === "error"
+                          ? "Ошибка синхронизации"
+                          : syncState === "saving"
+                            ? "Сохранение..."
+                            : "Синхронизировано"
+                      }
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        syncState === "error"
+                          ? "bg-red-500"
+                          : syncState === "saving"
+                            ? "bg-amber-400 animate-pulse"
+                            : "bg-emerald-400"
+                      }`}
+                    />
+                    <Flame
+                      className={`w-4 h-4 ${streak > 0 ? "text-[#9fd0ff] animate-pulse" : "text-slate-600"}`}
+                    />
+                    <span className="tracking-widest">{streak}D</span>
+                  </div>
+                </header>
 
-                  {/* Статус развития */}
-                  <section className="mb-5">
-                    <SysSubtitle>СТАТУС РАЗВИТИЯ</SysSubtitle>
-                    <div className="mt-3 flex items-center gap-3">
-                      <div
-                        className="shrink-0 flex flex-col items-center justify-center w-16 h-16 border"
+                {/* Профиль и выход */}
+                <div className="flex items-center justify-between gap-3 mb-5 pb-3 border-b border-[#5ecbff]/20 text-[10px] tracking-widest uppercase">
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-1 min-w-0 text-[#9fd0ff] hover:text-white transition"
+                  >
+                    <User className="w-3 h-3 shrink-0" />
+                    <span className="truncate">
+                      {profile
+                        ? `${profile.name} [${profile.authId}]`
+                        : "ОПЕРАТОР"}
+                    </span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    title="Выйти из системы"
+                    className="shrink-0 flex items-center gap-1 text-rose-300/80 hover:text-rose-300 transition cursor-pointer"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    ВЫХОД
+                  </button>
+                </div>
+
+                {/* Статус развития */}
+                <section className="mb-5">
+                  <SysSubtitle>СТАТУС РАЗВИТИЯ</SysSubtitle>
+                  <div className="mt-3 flex items-center gap-3">
+                    <div
+                      className="shrink-0 flex flex-col items-center justify-center w-16 h-16 border"
+                      style={{
+                        borderColor: "rgba(94,203,255,0.5)",
+                        background: "rgba(94,203,255,0.06)",
+                        boxShadow: "0 0 10px rgba(94,203,255,0.3)",
+                      }}
+                    >
+                      <span className="text-[8px] tracking-widest text-[#7fa8d6] uppercase">
+                        LVL
+                      </span>
+                      <span
+                        className="sys-title text-3xl leading-none text-white"
                         style={{
-                          borderColor: "rgba(94,203,255,0.5)",
-                          background: "rgba(94,203,255,0.06)",
-                          boxShadow: "0 0 10px rgba(94,203,255,0.3)",
+                          textShadow:
+                            "0 0 6px #5ecbff, 0 0 16px rgba(94,203,255,0.6)",
                         }}
                       >
-                        <span className="text-[8px] tracking-widest text-[#7fa8d6] uppercase">
-                          LVL
-                        </span>
-                        <span
-                          className="sys-title text-3xl leading-none text-white"
-                          style={{
-                            textShadow:
-                              "0 0 6px #5ecbff, 0 0 16px rgba(94,203,255,0.6)",
-                          }}
-                        >
-                          {level}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[9px] tracking-[0.2em] text-[#7fa8d6] uppercase">
-                          Ранг
-                        </div>
-                        <div
-                          className="sys-title text-lg text-white truncate"
-                          style={{ textShadow: "0 0 4px rgba(94,203,255,0.5)" }}
-                        >
-                          {hunterRankInfo.rank}
-                        </div>
-                      </div>
+                        {level}
+                      </span>
                     </div>
-                    <div className="mt-3">
-                      <SysRow label="Опыт" value={`${xp}/${xpPerLevel} XP`} />
-                    </div>
-                    <div className="mt-2 h-2.5 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[9px] tracking-[0.2em] text-[#7fa8d6] uppercase">
+                        Ранг
+                      </div>
                       <div
-                        className="h-full transition-all duration-500"
-                        style={{
-                          width: `${(xp / xpPerLevel) * 100}%`,
-                          background:
-                            "linear-gradient(90deg, #5ecbff, #dff0ff)",
-                          boxShadow: "0 0 10px #5ecbff",
-                        }}
-                      />
+                        className="sys-title text-lg text-white truncate"
+                        style={{ textShadow: "0 0 4px rgba(94,203,255,0.5)" }}
+                      >
+                        {hunterRankInfo.rank}
+                      </div>
                     </div>
-                  </section>
-
-                  {/* Ежедневный прогресс */}
-                  <section className="mb-5">
-                    <SysRow
-                      label="Ежедневный прогресс"
-                      value={`${dailyProgress}%`}
-                      done={dailyProgress === 100}
+                  </div>
+                  <div className="mt-3">
+                    <SysRow label="Опыт" value={`${xp}/${xpPerLevel} XP`} />
+                  </div>
+                  <div className="mt-2 h-2.5 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
+                    <div
+                      className="h-full transition-all duration-500"
+                      style={{
+                        width: `${(xp / xpPerLevel) * 100}%`,
+                        background: "linear-gradient(90deg, #5ecbff, #dff0ff)",
+                        boxShadow: "0 0 10px #5ecbff",
+                      }}
                     />
-                    <div className="mt-2 h-2 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
-                      <div
-                        className="h-full transition-all duration-300"
-                        style={{
-                          width: `${dailyProgress}%`,
-                          background:
-                            dailyProgress === 100
-                              ? "linear-gradient(90deg, #34d399, #d1fae5)"
-                              : "linear-gradient(90deg, #5ecbff, #dff0ff)",
-                          boxShadow:
-                            dailyProgress === 100
-                              ? "0 0 10px #34d399"
-                              : "0 0 10px #5ecbff",
-                        }}
+                  </div>
+                </section>
+
+                {/* Ежедневный прогресс */}
+                <section className="mb-5">
+                  <SysRow
+                    label="Ежедневный прогресс"
+                    value={`${dailyProgress}%`}
+                    done={dailyProgress === 100}
+                  />
+                  <div className="mt-2 h-2 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
+                    <div
+                      className="h-full transition-all duration-300"
+                      style={{
+                        width: `${dailyProgress}%`,
+                        background:
+                          dailyProgress === 100
+                            ? "linear-gradient(90deg, #34d399, #d1fae5)"
+                            : "linear-gradient(90deg, #5ecbff, #dff0ff)",
+                        boxShadow:
+                          dailyProgress === 100
+                            ? "0 0 10px #34d399"
+                            : "0 0 10px #5ecbff",
+                      }}
+                    />
+                  </div>
+                </section>
+
+                {/* Ежедневные авто-квесты */}
+                <section className="mb-5">
+                  <SysSubtitle>ЕЖЕДНЕВНЫЕ КВЕСТЫ</SysSubtitle>
+                  <div className="mt-3 space-y-2">
+                    {dailyQuests.map((q) => {
+                      const meta = CATEGORY_META[q.category] || {};
+                      const Icon =
+                        meta.icon === "BookOpen" ? BookOpen : Dumbbell;
+                      return (
+                        <div
+                          key={q.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleDailyQuest(q.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleDailyQuest(q.id);
+                            }
+                          }}
+                          className={`flex items-center gap-2.5 border px-2.5 py-2 cursor-pointer ${
+                            q.completed
+                              ? "border-emerald-400/30 bg-emerald-400/5"
+                              : "border-[#5ecbff]/25 bg-[#5ecbff]/[0.04]"
+                          }`}
+                        >
+                          <Icon
+                            className={`w-4 h-4 shrink-0 ${q.completed ? "text-emerald-300" : "text-[#5ecbff]"}`}
+                          />
+                          <div
+                            className={`flex-1 min-w-0 ${q.completed ? "line-through opacity-70" : ""}`}
+                          >
+                            <SysRow
+                              label={q.text}
+                              value={q.completed ? "1/1" : "0/1"}
+                              done={q.completed}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Босс недели */}
+                {boss && (
+                  <section className="mb-5">
+                    <SysSubtitle tone={boss.defeated ? "green" : "red"}>
+                      БОСС НЕДЕЛИ
+                    </SysSubtitle>
+                    <div className="mt-3 flex items-center gap-3">
+                      <Skull
+                        className={`w-8 h-8 shrink-0 ${boss.defeated ? "text-emerald-300" : "text-rose-300"}`}
                       />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] tracking-[0.15em] text-[#e6f1ff] uppercase truncate">
+                          {boss.defeated
+                            ? `${boss.theme} — ПОВЕРЖЕН`
+                            : boss.theme}
+                        </div>
+                        <div className="mt-1.5 h-2.5 border border-rose-400/40 bg-[#020817]/60 p-0.5">
+                          <div
+                            className="h-full transition-all duration-500"
+                            style={{
+                              width: `${(boss.hp / boss.maxHp) * 100}%`,
+                              background: boss.defeated
+                                ? "linear-gradient(90deg, #34d399, #d1fae5)"
+                                : "linear-gradient(90deg, #ff4d6d, #ffb4c2)",
+                              boxShadow: boss.defeated
+                                ? "0 0 10px #34d399"
+                                : "0 0 10px #ff4d6d",
+                            }}
+                          />
+                        </div>
+                        <div className="mt-1 text-[9px] text-[#8fb6e6] text-right">
+                          {boss.hp}/{boss.maxHp} HP
+                        </div>
+                      </div>
                     </div>
                   </section>
+                )}
 
-                  {/* История активности */}
-                  <section className="mb-5">
-                    <SysSubtitle>ИСТОРИЯ АКТИВНОСТИ</SysSubtitle>
-                    <div className="mt-3 grid grid-cols-7 gap-1.5 text-center">
-                      {history.map((item) => {
-                        const full =
-                          item.total > 0 && item.completed === item.total;
-                        const partial =
-                          item.completed > 0 && item.completed < item.total;
-                        return (
-                          <button
-                            key={item.date}
-                            onClick={() => {
-                              playSound(SOUNDS.openModal);
-                              setSelectedDayHistory(item);
-                            }}
-                            className={`flex flex-col items-center justify-between p-1.5 border text-[9px] transition hover:scale-105 active:scale-95 cursor-pointer ${
-                              item.dayOffset === 0
-                                ? "border-[#5ecbff] bg-[#5ecbff]/15 shadow-[0_0_10px_rgba(94,203,255,0.4)]"
-                                : "border-[#5ecbff]/25 bg-[#020817]/50"
+                {/* История активности */}
+                <section className="mb-5">
+                  <SysSubtitle>ИСТОРИЯ АКТИВНОСТИ</SysSubtitle>
+                  <div className="mt-3 grid grid-cols-7 gap-1.5 text-center">
+                    {history.map((item) => {
+                      const full =
+                        item.total > 0 && item.completed === item.total;
+                      const partial =
+                        item.completed > 0 && item.completed < item.total;
+                      return (
+                        <button
+                          key={item.date}
+                          onClick={() => {
+                            playSound(SOUNDS.openModal);
+                            setSelectedDayHistory(item);
+                          }}
+                          className={`flex flex-col items-center justify-between p-1.5 border text-[9px] transition hover:scale-105 active:scale-95 cursor-pointer ${
+                            item.dayOffset === 0
+                              ? "border-[#5ecbff] bg-[#5ecbff]/15 shadow-[0_0_10px_rgba(94,203,255,0.4)]"
+                              : "border-[#5ecbff]/25 bg-[#020817]/50"
+                          }`}
+                        >
+                          <span className="text-[#8fb6e6] text-[8px] truncate max-w-full mb-1">
+                            {item.label}
+                          </span>
+                          <div
+                            className={`w-5 h-5 flex items-center justify-center font-bold my-0.5 border ${
+                              full
+                                ? "bg-emerald-400 text-slate-950 border-emerald-300"
+                                : partial
+                                  ? "bg-[#5ecbff]/20 text-[#cfe6ff] border-[#5ecbff]/60"
+                                  : "bg-slate-900 text-slate-600 border-slate-800"
                             }`}
                           >
-                            <span className="text-[#8fb6e6] text-[8px] truncate max-w-full mb-1">
-                              {item.label}
-                            </span>
-                            <div
-                              className={`w-5 h-5 flex items-center justify-center font-bold my-0.5 border ${
-                                full
-                                  ? "bg-emerald-400 text-slate-950 border-emerald-300"
-                                  : partial
-                                    ? "bg-[#5ecbff]/20 text-[#cfe6ff] border-[#5ecbff]/60"
-                                    : "bg-slate-900 text-slate-600 border-slate-800"
-                              }`}
-                            >
-                              {full ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                              ) : (
-                                <span>{item.completed}</span>
-                              )}
-                            </div>
-                            <span className="text-[8px] text-[#5f86b3]">
-                              {item.completed}/{item.total}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-
-                  {/* Ссылки */}
-                  <div className="grid grid-cols-2 gap-2 mb-5">
-                    <Link
-                      href="/achievements"
-                      className="sys-title col-span-2 flex items-center justify-between border border-[#5ecbff]/60 bg-[#5ecbff]/10 hover:bg-[#5ecbff] hover:text-[#020617] text-[#cfe6ff] py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition"
-                    >
-                      <span className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4" />
-                        ДОСТИЖЕНИЯ
-                      </span>
-                      <span className="text-[10px] opacity-70">→</span>
-                    </Link>
-                    <Link
-                      href="/profile"
-                      className="sys-title flex items-center justify-center gap-2 border border-[#5ecbff]/60 bg-[#5ecbff]/10 hover:bg-[#5ecbff] hover:text-[#020617] text-[#cfe6ff] py-2.5 text-xs tracking-[0.15em] uppercase transition"
-                    >
-                      <User className="w-4 h-4" />
-                      ПРОФИЛЬ
-                    </Link>
-                    <Link
-                      href="/leaderboard"
-                      className="sys-title flex items-center justify-center gap-2 border border-amber-400/60 bg-amber-400/10 hover:bg-amber-400 hover:text-slate-950 text-amber-200 py-2.5 text-xs tracking-[0.15em] uppercase transition"
-                    >
-                      <Trophy className="w-4 h-4" />
-                      РЕЙТИНГ
-                    </Link>
+                            {full ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                            ) : (
+                              <span>{item.completed}</span>
+                            )}
+                          </div>
+                          <span className="text-[8px] text-[#5f86b3]">
+                            {item.completed}/{item.total}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
+                </section>
 
-                  {/* Кнопки управления */}
-                  <div className="grid grid-cols-1 gap-2 mb-5">
-                    <SysButton
-                      onClick={handleOpenModal}
-                      className="w-full flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Plus className="w-4 h-4" />[ ПОЛУЧИТЬ МИССИЮ ]
-                      </span>
-                      <span className="text-[10px] opacity-70">+25 XP</span>
-                    </SysButton>
-                    <SysButton
-                      tone="green"
-                      onClick={handleFinishDay}
-                      className="w-full flex items-center justify-between"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Power className="w-4 h-4" />[ ЗАКОНЧИТЬ НА СЕГОДНЯ ]
-                      </span>
-                      <span className="text-[10px] opacity-70">100%</span>
-                    </SysButton>
-                  </div>
+                {/* Ссылки */}
+                <div className="grid grid-cols-2 gap-2 mb-5">
+                  <Link
+                    href="/achievements"
+                    className="sys-title col-span-2 flex items-center justify-between border border-[#5ecbff]/60 bg-[#5ecbff]/10 hover:bg-[#5ecbff] hover:text-[#020617] text-[#cfe6ff] py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition"
+                  >
+                    <span className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4" />
+                      ДОСТИЖЕНИЯ
+                    </span>
+                    <span className="text-[10px] opacity-70">→</span>
+                  </Link>
+                  <Link
+                    href="/profile"
+                    className="sys-title flex items-center justify-center gap-2 border border-[#5ecbff]/60 bg-[#5ecbff]/10 hover:bg-[#5ecbff] hover:text-[#020617] text-[#cfe6ff] py-2.5 text-xs tracking-[0.15em] uppercase transition"
+                  >
+                    <User className="w-4 h-4" />
+                    ПРОФИЛЬ
+                  </Link>
+                  <Link
+                    href="/leaderboard"
+                    className="sys-title flex items-center justify-center gap-2 border border-amber-400/60 bg-amber-400/10 hover:bg-amber-400 hover:text-slate-950 text-amber-200 py-2.5 text-xs tracking-[0.15em] uppercase transition"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    РЕЙТИНГ
+                  </Link>
+                </div>
 
-                  {/* Список задач */}
-                  <section>
-                    <SysSubtitle>ЦЕЛИ</SysSubtitle>
-                    <div className="mt-3 space-y-2 max-h-40 overflow-y-auto pr-1">
-                      <AnimatePresence>
-                        {tasks.length === 0 ? (
+                {/* Кнопки управления */}
+                <div className="grid grid-cols-1 gap-2 mb-5">
+                  <SysButton
+                    onClick={handleOpenModal}
+                    className="w-full flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Plus className="w-4 h-4" />[ ПОЛУЧИТЬ МИССИЮ ]
+                    </span>
+                    <span className="text-[10px] opacity-70">+25 XP</span>
+                  </SysButton>
+                  <SysButton
+                    tone="green"
+                    onClick={handleFinishDay}
+                    className="w-full flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Power className="w-4 h-4" />[ ЗАКОНЧИТЬ НА СЕГОДНЯ ]
+                    </span>
+                    <span className="text-[10px] opacity-70">100%</span>
+                  </SysButton>
+                </div>
+
+                {/* Список задач */}
+                <section>
+                  <SysSubtitle>ЦЕЛИ</SysSubtitle>
+                  <div className="mt-3 space-y-2 max-h-40 overflow-y-auto pr-1">
+                    <AnimatePresence>
+                      {tasks.length === 0 ? (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="text-center py-5 border border-dashed border-[#5ecbff]/30 text-[#5f86b3] text-xs tracking-widest uppercase"
+                        >
+                          // НЕТ АКТИВНЫХ КВЕСТОВ
+                        </motion.div>
+                      ) : (
+                        tasks.map((task) => (
                           <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="text-center py-5 border border-dashed border-[#5ecbff]/30 text-[#5f86b3] text-xs tracking-widest uppercase"
+                            key={task.id}
+                            layout
+                            initial={{
+                              opacity: 0,
+                              x: -20,
+                              boxShadow: "0 0 0px rgba(94,203,255,0)",
+                            }}
+                            animate={{
+                              opacity: 1,
+                              x: 0,
+                              boxShadow: [
+                                "0 0 16px rgba(94,203,255,0.6)",
+                                "0 0 0px rgba(94,203,255,0)",
+                              ],
+                            }}
+                            exit={{ opacity: 0, x: 20 }}
+                            transition={{ duration: 0.7, ease: "easeOut" }}
+                            className={`flex items-start gap-2 border px-2.5 py-2 ${
+                              task.completed
+                                ? "border-emerald-400/30 bg-emerald-400/5"
+                                : "border-[#5ecbff]/25 bg-[#5ecbff]/[0.04]"
+                            }`}
                           >
-                            // НЕТ АКТИВНЫХ КВЕСТОВ
-                          </motion.div>
-                        ) : (
-                          tasks.map((task) => (
-                            <motion.div
-                              key={task.id}
-                              layout
-                              initial={{
-                                opacity: 0,
-                                x: -20,
-                                boxShadow: "0 0 0px rgba(94,203,255,0)",
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => toggleTask(task.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  toggleTask(task.id);
+                                }
                               }}
-                              animate={{
-                                opacity: 1,
-                                x: 0,
-                                boxShadow: [
-                                  "0 0 16px rgba(94,203,255,0.6)",
-                                  "0 0 0px rgba(94,203,255,0)",
-                                ],
-                              }}
-                              exit={{ opacity: 0, x: 20 }}
-                              transition={{ duration: 0.7, ease: "easeOut" }}
-                              className={`flex items-start gap-2 border px-2.5 py-2 ${
-                                task.completed
-                                  ? "border-emerald-400/30 bg-emerald-400/5"
-                                  : "border-[#5ecbff]/25 bg-[#5ecbff]/[0.04]"
-                              }`}
+                              className={`flex-1 min-w-0 cursor-pointer ${task.completed ? "line-through opacity-70" : ""}`}
                             >
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => toggleTask(task.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    toggleTask(task.id);
-                                  }
-                                }}
-                                className={`flex-1 min-w-0 cursor-pointer ${task.completed ? "line-through opacity-70" : ""}`}
-                              >
-                                <SysRow
-                                  label={task.text}
-                                  value={task.completed ? "1/1" : "0/1"}
-                                  done={task.completed}
-                                />
-                              </div>
-                              <button
-                                onClick={() => deleteTask(task.id)}
-                                aria-label="Удалить миссию"
-                                className="text-[#5f86b3] hover:text-rose-400 p-1 transition shrink-0 cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </motion.div>
-                          ))
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </section>
-                </SystemFrame>
-              </div>
+                              <SysRow
+                                label={task.text}
+                                value={task.completed ? "1/1" : "0/1"}
+                                done={task.completed}
+                              />
+                            </div>
+                            <button
+                              onClick={() => deleteTask(task.id)}
+                              aria-label="Удалить миссию"
+                              className="text-[#5f86b3] hover:text-rose-400 p-1 transition shrink-0 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </motion.div>
+                        ))
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </section>
+              </SystemFrame>
             </div>
           </div>
         </div>
-      </SystemFrame>
+      </div>
 
       {/* Окно создания миссии */}
       <SystemWindow

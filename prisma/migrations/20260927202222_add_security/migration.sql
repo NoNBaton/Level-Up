@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Player" ADD COLUMN     "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "lastProgressAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "lockedUntil" TIMESTAMP(3),
+ADD COLUMN     "recoveryAnswerHash" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "recoveryQuestion" TEXT NOT NULL DEFAULT '';
