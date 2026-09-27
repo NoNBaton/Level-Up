@@ -7,51 +7,50 @@
     study: { label: "УЧЁБА", icon: "BookOpen" },
     };
     type QuestDef = {
-    id: string;
-    category: "sport" | "study";
-    base: number;
-    step: number;
-    cap: number;
-    isFloat?: boolean;
-    text: (n: number) => string;
-    };
+  id: string;
+  category: string;
+  base: number;
+  step: number;
+  cap: number;
+  isFloat?: boolean;
+  text: (n: number) => string;
+};
 
-
-    export const QUEST_DEFS = [
-    {
-        id: "sport_pushups",
-        category: "sport",
-        base: 10,
-        step: 10,
-        cap: 500,
-        text: (n) => `Сделай ${n} отжиманий`,
-    },
-    {
-        id: "sport_squats",
-        category: "sport",
-        base: 10,
-        step: 10,
-        cap: 500,
-        text: (n) => `Сделай ${n} приседаний`,
-    },
-    {
-        id: "sport_run",
-        category: "sport",
-        base: 1,
-        step: 0.2,
-        cap: 20,
-        isFloat: true,
-        text: (n) => `Пробеги ${n} км`,
-    },
-    {
-        id: "study_read",
-        category: "study",
-        base: 5,
-        step: 1,
-        cap: 40,
-        text: (n) => `Прочитай ${n} страниц`,
-    },
-    ];
+export const QUEST_DEFS: QuestDef[] = [
+  {
+    id: "sport_pushups",
+    category: "sport",
+    base: 10,
+    step: 10,
+    cap: 500,
+    text: (n: number) => `Сделай ${n} отжиманий`,
+  },
+  {
+    id: "sport_squats",
+    category: "sport",
+    base: 10,
+    step: 10,
+    cap: 500,
+    text: (n: number) => `Сделай ${n} приседаний`,
+  },
+  {
+    id: "sport_run",
+    category: "sport",
+    base: 1,
+    step: 0.2,
+    cap: 20,
+    isFloat: true,
+    text: (n: number) => `Пробеги ${n} км`,
+  },
+  {
+    id: "study_read",
+    category: "study",
+    base: 5,
+    step: 1,
+    cap: 40,
+    text: (n: number) => `Прочитай ${n} страниц`,
+  },
+];
     export function questAmount(def: QuestDef, streak: number) {
     const raw = def.base + def.step * Math.max(0, streak);
     const capped = Math.min(def.cap, raw);
