@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionPlayerId } from "@/lib/session";
 import { getRank } from "@/lib/player";
+import { ACH_TITLES, autoTotalOf, weekStartUTC } from "@/lib/social";
 
 function clampInt(v: unknown, min: number, max: number): number {
   const n = Math.floor(Number(v));
   if (!Number.isFinite(n)) return min;
   return Math.min(max, Math.max(min, n));
+}
+
+function doneCount(list: unknown): number {
+  return Array.isArray(list)
+    ? list.filter((q: any) => q && q.completed === true).length
+    : 0;
 }
 
 export async function PUT(req: Request) {
@@ -40,9 +47,8 @@ export async function PUT(req: Request) {
   const tasks = Array.isArray(incomingProgress.tasks)
     ? incomingProgress.tasks
     : [];
-  // Сколько "очков опыта" разумно получить за один запрос сохранения
   const maxTasksBasis = Math.max(20, tasks.length + 5);
-  const maxGain = maxTasksBasis * 25;
+  const maxGain = maxTasksBasis * 25 + 200; // +200: запас на награды дуэлей и босса
 
   const newPoints = level * 100 + xp;
   if (newPoints - prevPoints > maxGain) {
@@ -51,7 +57,6 @@ export async function PUT(req: Request) {
     xp = capped % 100;
   }
 
-  // Стрик растёт максимум на 1 за раз, либо может обнулиться до 0
   if (streak > current.streak + 1) {
     streak = current.streak + 1;
   }
@@ -75,6 +80,26 @@ export async function PUT(req: Request) {
   }
   progress.completedTotal = completedTotal;
 
+  // Серверный счётчик авто-квестов (для дуэлей и общего босса).
+  // Клиент его не присылает и не может задать: считаем сами по изменению отметок.
+  const doneNow = doneCount(progress.dailyQuests);
+  const donePrev = doneCount(prevProgress.dailyQuests);
+  const sameDay =
+    !!progress.dailyQuestsDate &&
+    progress.dailyQuestsDate === prevProgress.dailyQuestsDate;
+  const delta = Math.max(
+    -4,
+    Math.min(4, sameDay ? doneNow - donePrev : doneNow),
+  );
+  const prevAuto = autoTotalOf(prevProgress);
+  const week = weekStartUTC();
+  const prevBase = prevProgress.weekBase;
+  progress.autoTotal = Math.max(0, prevAuto + delta);
+  progress.weekBase =
+    prevBase && prevBase.weekStart === week
+      ? prevBase
+      : { weekStart: week, base: prevAuto };
+
   if (JSON.stringify(progress).length > 200_000) {
     return NextResponse.json({ error: "СЛИШКОМ МНОГО ДАННЫХ" }, { status: 413 });
   }
@@ -92,6 +117,39 @@ export async function PUT(req: Request) {
         lastProgressAt: new Date(),
       },
     });
+
+    // События для ленты (ошибка здесь не должна ломать сохранение)
+    try {
+      const events: { playerId: string; type: string; text: string }[] = [];
+      if (level > current.level) {
+        const text = `достиг ${level} уровня`;
+        const dup = await prisma.activity.findFirst({
+          where: {
+            playerId: id,
+            type: "level",
+            text,
+            createdAt: { gt: new Date(Date.now() - 24 * 3600 * 1000) },
+          },
+        });
+        if (!dup) events.push({ playerId: id, type: "level", text });
+      }
+      const had = new Set(current.achievements);
+      for (const a of achievements) {
+        if (!had.has(a) && ACH_TITLES[a]) {
+          events.push({
+            playerId: id,
+            type: "achievement",
+            text: `получил достижение «${ACH_TITLES[a]}»`,
+          });
+        }
+      }
+      if (events.length) {
+        await prisma.activity.createMany({ data: events.slice(0, 5) });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error(error);

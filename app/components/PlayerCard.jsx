@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Lock,
   Skull,
+  Users,
+  Swords,
 } from "lucide-react";
 
 export const AVATAR_STYLES = {
@@ -48,6 +50,12 @@ const ACH_META = {
   streak_30: { title: "ЛЕГЕНДА СИСТЕМЫ", desc: "Стрик 30 дней", Icon: Crown },
   level_5: { title: "ВЕТЕРАН КОДА", desc: "5 уровень", Icon: Star },
   level_25: { title: "ПОВЕЛИТЕЛЬ СИСТЕМЫ", desc: "25 уровень", Icon: Trophy },
+  team_boss: {
+    title: "КОМАНДА ОХОТНИКОВ",
+    desc: "Босс друзей повержен",
+    Icon: Users,
+  },
+  duel_win: { title: "ДУЭЛЯНТ", desc: "Победа в дуэли", Icon: Swords },
   day_complete: {
     title: "ДЕНЬ ЗАКРЫТ",
     desc: "100% за день",

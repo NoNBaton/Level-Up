@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Trophy } from "lucide-react";
 import PlayerCard from "../../components/PlayerCard";
-
+import FriendActions from "../../components/FriendActions";
 export default function PublicProfilePage() {
   const params = useParams();
   const raw = Array.isArray(params.nickname)
@@ -89,8 +89,12 @@ export default function PublicProfilePage() {
             НЕ УДАЛОСЬ ЗАГРУЗИТЬ ПРОФИЛЬ
           </div>
         )}
-
-        {state === "ok" && player && <PlayerCard player={player} />}
+        {state === "ok" && player && (
+          <>
+            <FriendActions nickname={player.nickname} />
+            <PlayerCard player={player} />
+          </>
+        )}
       </main>
     </div>
   );

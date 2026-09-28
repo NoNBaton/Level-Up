@@ -20,6 +20,8 @@ import {
   Dumbbell,
   BookOpen,
   Skull,
+  Users,
+  BellRing,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -207,6 +209,20 @@ const ACHIEVEMENTS_LIST = {
     rarity: "legendary",
     animationType: "legendary_storm",
   },
+  TEAM_BOSS: {
+    id: "team_boss",
+    title: "КОМАНДА ОХОТНИКОВ",
+    description: "Общий босс друзей повержен!",
+    rarity: "epic",
+    animationType: "streak_pulse",
+  },
+  DUEL_WIN: {
+    id: "duel_win",
+    title: "ДУЭЛЯНТ",
+    description: "Победа в дуэли недели!",
+    rarity: "epic",
+    animationType: "level_spin",
+  },
 };
 
 const ACHIEVEMENT_ANIMATIONS = {
@@ -286,7 +302,14 @@ export default function HomePage() {
   const saveTimer = useRef(null);
   const payloadRef = useRef(null);
   const dirtyRef = useRef(false);
-
+  const changeXpRef = useRef(null);
+  const triggerRef = useRef(null);
+  const claimingRef = useRef(false);
+  const [notes, setNotes] = useState({
+    requests: 0,
+    duelInvites: 0,
+    nudges: [],
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDayFinishedModalOpen, setIsDayFinishedModalOpen] = useState(false);
   const [selectedDayHistory, setSelectedDayHistory] = useState(null);
@@ -715,7 +738,76 @@ export default function HomePage() {
       if (level < 25 && newLevel >= 25) triggerAchievement("LEVEL_25");
     }
   };
+  changeXpRef.current = changeXp;
+  triggerRef.current = triggerAchievement;
 
+  // Забираем награды (общий босс, дуэли)
+  useEffect(() => {
+    if (!isLoaded || !profile || loadedFor.current !== profile.authId) return;
+
+    const run = async () => {
+      if (claimingRef.current) return;
+      claimingRef.current = true;
+      try {
+        const res = await fetch("/api/rewards", { cache: "no-store" });
+        if (!res.ok) return;
+        const { rewards } = await res.json();
+        let totalXp = 0;
+        const achs = [];
+        for (const r of rewards || []) {
+          const c = await fetch("/api/rewards/claim", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: r.key }),
+          });
+          if (!c.ok) continue;
+          totalXp += r.xp || 0;
+          if (r.achievement) achs.push(r.achievement);
+        }
+        if (totalXp > 0) changeXpRef.current?.(totalXp);
+        achs.forEach((a) => triggerRef.current?.(a));
+      } catch {
+        // ignore
+      } finally {
+        claimingRef.current = false;
+      }
+    };
+
+    run();
+    const onVis = () => {
+      if (document.visibilityState === "visible") run();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [isLoaded, profile]);
+
+  // Уведомления: заявки, вызовы, подталкивания
+  useEffect(() => {
+    if (!isLoaded || !profile) return;
+    const loadNotes = async () => {
+      try {
+        const res = await fetch("/api/notifications", { cache: "no-store" });
+        if (res.ok) setNotes(await res.json());
+      } catch {
+        // ignore
+      }
+    };
+    loadNotes();
+    const onVis = () => {
+      if (document.visibilityState === "visible") loadNotes();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [isLoaded, profile]);
+
+  const dismissNudges = async () => {
+    setNotes((n) => ({ ...n, nudges: [] }));
+    try {
+      await fetch("/api/notifications", { method: "POST" });
+    } catch {
+      // ignore
+    }
+  };
   const completedTasksCount = tasks.filter((t) => t.completed).length;
   const dailyProgress =
     tasks.length > 0
@@ -1115,7 +1207,42 @@ export default function HomePage() {
                     ВЫХОД
                   </button>
                 </div>
-
+                {(notes.requests > 0 ||
+                  notes.duelInvites > 0 ||
+                  notes.nudges.length > 0) && (
+                  <div className="mb-5 border border-amber-400/50 bg-amber-400/10 p-2.5 text-[11px] tracking-wider text-amber-200 space-y-1">
+                    {notes.nudges.map((n) => (
+                      <div key={n.id} className="flex items-center gap-2">
+                        <BellRing className="w-3.5 h-3.5 shrink-0" />
+                        <span className="uppercase truncate">
+                          {n.from} ЖДЁТ, ЧТО ВЫ ЗАКРОЕТЕ КВЕСТЫ
+                        </span>
+                      </div>
+                    ))}
+                    {notes.requests > 0 && (
+                      <div>ЗАЯВОК В ДРУЗЬЯ: {notes.requests}</div>
+                    )}
+                    {notes.duelInvites > 0 && (
+                      <div>ВЫЗОВОВ НА ДУЭЛЬ: {notes.duelInvites}</div>
+                    )}
+                    <div className="flex items-center justify-between pt-1">
+                      <Link
+                        href="/friends"
+                        className="underline hover:text-white"
+                      >
+                        ОТКРЫТЬ ДРУЗЕЙ →
+                      </Link>
+                      {notes.nudges.length > 0 && (
+                        <button
+                          onClick={dismissNudges}
+                          className="underline hover:text-white cursor-pointer"
+                        >
+                          СКРЫТЬ
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {/* Статус развития */}
                 <section className="mb-5">
                   <SysSubtitle>СТАТУС РАЗВИТИЯ</SysSubtitle>
@@ -1349,6 +1476,16 @@ export default function HomePage() {
                   >
                     <Trophy className="w-4 h-4" />
                     РЕЙТИНГ
+                  </Link>
+                  <Link
+                    href="/friends"
+                    className="sys-title col-span-2 flex items-center justify-between border border-emerald-400/60 bg-emerald-400/10 hover:bg-emerald-400 hover:text-slate-950 text-emerald-200 py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      ДРУЗЬЯ
+                    </span>
+                    <span className="text-[10px] opacity-70">→</span>
                   </Link>
                 </div>
 

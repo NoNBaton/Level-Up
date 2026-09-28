@@ -13,6 +13,7 @@ import {
   Skull,
   Swords,
   RefreshCw,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -263,6 +264,31 @@ const ACHIEVEMENTS = [
     customCheck: (l, s, t) =>
       Number(l) >= 50 && Number(s) >= 90 && Number(t) >= 250,
   },
+  // --- РАЗДЕЛ: БОССЫ И ДУЭЛИ ---
+  {
+    id: "boss_defeated",
+    category: "events",
+    serverId: "boss_defeated",
+    title: "ОХОТНИК НА БОССОВ",
+    req: 1,
+    desc: "Победите личного босса недели, выполняя ежедневные квесты.",
+  },
+  {
+    id: "team_boss",
+    category: "events",
+    serverId: "team_boss",
+    title: "КОМАНДА ОХОТНИКОВ",
+    req: 1,
+    desc: "Победите общего босса вместе с друзьями и заберите награду.",
+  },
+  {
+    id: "duel_win",
+    category: "events",
+    serverId: "duel_win",
+    title: "ДУЭЛЯНТ",
+    req: 1,
+    desc: "Победите друга в дуэли недели.",
+  },
 ];
 
 export default function AchievementsPage() {
@@ -271,6 +297,7 @@ export default function AchievementsPage() {
     { id: "creed", label: "ОХОТА", Icon: Swords },
     { id: "level", label: "КЛАСС", Icon: Zap },
     { id: "elite", label: "ТЕНИ", Icon: Skull, purple: true },
+    { id: "events", label: "БОССЫ", Icon: Users },
   ];
 
   const todayStr = () => {
@@ -293,8 +320,12 @@ export default function AchievementsPage() {
     const tasks = Array.isArray(prog.tasks) ? prog.tasks : [];
     return fromHistory + tasks.filter((t) => t && t.completed).length;
   }
-
-  const [stats, setStats] = useState({ streak: 0, level: 1, tasks: 0 });
+  const [stats, setStats] = useState({
+    streak: 0,
+    level: 1,
+    tasks: 0,
+    achievements: [],
+  });
   const [state, setState] = useState("loading"); // loading | ok | guest | error
   const [activeTab, setActiveTab] = useState("streak");
   const [refreshing, setRefreshing] = useState(false);
@@ -319,6 +350,9 @@ export default function AchievementsPage() {
         streak: Number(player.streak) || 0,
         level: Number(player.level) || 1,
         tasks: totalCompleted(prog),
+        achievements: Array.isArray(player.achievements)
+          ? player.achievements
+          : [],
       });
       setState("ok");
     } catch {
@@ -339,6 +373,7 @@ export default function AchievementsPage() {
   const unlockedIds = useMemo(
     () =>
       ACHIEVEMENTS.filter((ach) => {
+        if (ach.serverId) return stats.achievements.includes(ach.serverId);
         if (ach.customCheck) {
           return ach.customCheck(stats.level, stats.streak, stats.tasks);
         }
@@ -369,7 +404,9 @@ export default function AchievementsPage() {
         ? "МИССИЙ"
         : ach.category === "level"
           ? "LVL"
-          : "УСЛОВИЕ";
+          : ach.category === "events"
+            ? "РАЗ"
+            : "УСЛОВИЕ";
 
   const unlockedCount = unlockedIds.length;
   const list = ACHIEVEMENTS.filter((a) => a.category === activeTab);
@@ -489,7 +526,7 @@ export default function AchievementsPage() {
             </section>
 
             {/* Вкладки */}
-            <div className="grid grid-cols-4 gap-1.5 mb-4 shrink-0">
+            <div className="grid grid-cols-5 gap-1.5 mb-4 shrink-0">
               {TABS.map(({ id, label, Icon, purple }) => (
                 <button
                   key={id}

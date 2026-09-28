@@ -26,6 +26,88 @@ model Player {
   lastProgressAt      DateTime  @default(now())
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @default(now()) @updatedAt
-
+  sentRequests      Friendship[] @relation("FriendRequester")
+  receivedRequests  Friendship[] @relation("FriendAddressee")
+  reactionsGiven    Reaction[]   @relation("ReactionFrom")
+  reactionsReceived Reaction[]   @relation("ReactionTo")
+  activities      Activity[]    @relation("ActivityActor")
+  activityTargets Activity[]    @relation("ActivityTarget")
+  duelsStarted    Duel[]        @relation("DuelChallenger")
+  duelsReceived   Duel[]        @relation("DuelOpponent")
+  claims          RewardClaim[] @relation("PlayerClaims")
   @@index([level, xp])
+}
+model Friendship {
+  id          String   @id @default(uuid())
+  requesterId String
+  addresseeId String
+  status      String   @default("pending") // pending | accepted
+  createdAt   DateTime @default(now())
+
+  requester Player @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee Player @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
+model Reaction {
+  id        String   @id @default(uuid())
+  fromId    String
+  toId      String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  from Player @relation("ReactionFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   Player @relation("ReactionTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([toId])
+}
+model Activity {
+  id        String    @id @default(uuid())
+  playerId  String
+  type      String
+  text      String
+  toId      String?
+  seenAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  player Player  @relation("ActivityActor", fields: [playerId], references: [id], onDelete: Cascade)
+  target Player? @relation("ActivityTarget", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, createdAt])
+  @@index([toId, type, seenAt])
+}
+
+model Duel {
+  id             String    @id @default(uuid())
+  challengerId   String
+  opponentId     String
+  status         String    @default("pending") // pending | active | finished
+  challengerBase Int       @default(0)
+  opponentBase   Int       @default(0)
+  challengerScore Int      @default(0)
+  opponentScore  Int       @default(0)
+  startedAt      DateTime?
+  endsAt         DateTime?
+  winnerId       String?
+  createdAt      DateTime  @default(now())
+
+  challenger Player @relation("DuelChallenger", fields: [challengerId], references: [id], onDelete: Cascade)
+  opponent   Player @relation("DuelOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+
+  @@index([challengerId, status])
+  @@index([opponentId, status])
+}
+
+model RewardClaim {
+  id        String   @id @default(uuid())
+  playerId  String
+  key       String
+  createdAt DateTime @default(now())
+
+  player Player @relation("PlayerClaims", fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, key])
 }
