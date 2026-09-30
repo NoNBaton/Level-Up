@@ -1,7 +1,7 @@
 "use client";
 import { sfx } from "./lib/sounds";
 import React, { useState, useEffect, useRef } from "react";
-
+import PushToggle from "./components/PushToggle";
 import {
   Plus,
   Trash2,
@@ -1198,6 +1198,7 @@ export default function HomePage() {
                         : "ОПЕРАТОР"}
                     </span>
                   </Link>
+                  <PushToggle />
                   <button
                     onClick={handleLogout}
                     title="Выйти из системы"

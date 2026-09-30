@@ -35,6 +35,7 @@ model Player {
   duelsStarted    Duel[]        @relation("DuelChallenger")
   duelsReceived   Duel[]        @relation("DuelOpponent")
   claims          RewardClaim[] @relation("PlayerClaims")
+    pushSubscriptions PushSubscription[]
   @@index([level, xp])
 }
 model Friendship {
@@ -110,4 +111,16 @@ model RewardClaim {
   player Player @relation("PlayerClaims", fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([playerId, key])
+}
+model PushSubscription {
+  id        String   @id @default(uuid())
+  playerId  String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
 }

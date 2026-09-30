@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionPlayerId } from "@/lib/session";
 import { areFriends } from "@/lib/social";
+import { sendPushToPlayer } from "@/lib/push";
 
 export async function POST(req: Request) {
   const me = await getSessionPlayerId();
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
       );
     }
 
+    const me_ = await prisma.player.findUnique({ where: { id: me }, select: { nickname: true } });
     await prisma.activity.create({
       data: {
         playerId: me,
@@ -45,6 +47,11 @@ export async function POST(req: Request) {
         toId: target.id,
       },
     });
+    sendPushToPlayer(target.id, {
+      title: "LEVEL_UP // OS",
+      body: `${me_?.nickname ?? "Друг"} ждёт, что вы выполните квесты`,
+      url: "/",
+    }).catch(() => {});
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error(error);

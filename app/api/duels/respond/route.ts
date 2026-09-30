@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionPlayerId } from "@/lib/session";
 import { autoTotalOf, finalizeExpiredDuels, DUEL_DAYS } from "@/lib/social";
-
+import { sendPushToPlayer } from "@/lib/push";
 export async function POST(req: Request) {
   const me = await getSessionPlayerId();
   if (!me) {
@@ -67,6 +67,11 @@ export async function POST(req: Request) {
         endsAt: new Date(now.getTime() + DUEL_DAYS * 24 * 3600 * 1000),
       },
     });
+    sendPushToPlayer(duel.challengerId, {
+      title: "LEVEL_UP // OS",
+      body: `Дуэль началась! Соперник принял вызов`,
+      url: "/friends",
+    }).catch(() => {});
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error(error);

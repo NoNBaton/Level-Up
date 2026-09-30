@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionPlayerId } from "@/lib/session";
+import { sendPushToPlayer } from "@/lib/push";
 
 export async function POST(req: Request) {
   const me = await getSessionPlayerId();
@@ -56,6 +57,17 @@ export async function POST(req: Request) {
     await prisma.friendship.create({
       data: { requesterId: me, addresseeId: target.id },
     });
+
+    const me_ = await prisma.player.findUnique({
+      where: { id: me },
+      select: { nickname: true },
+    });
+    sendPushToPlayer(target.id, {
+      title: "LEVEL_UP // OS",
+      body: `${me_?.nickname ?? "Кто-то"} хочет добавить вас в друзья`,
+      url: "/friends",
+    }).catch(() => {});
+
     return NextResponse.json({ status: "pending" });
   } catch (error) {
     console.error(error);
