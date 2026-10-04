@@ -6,6 +6,7 @@ import { ArrowLeft, Trophy, Copy, Check } from "lucide-react";
 import PlayerCard from "../components/PlayerCard";
 import ThemePicker from "../components/ThemePicker";
 import StatsCard from "../components/StatsCard";
+import AmbientSound from "../components/AmbientSound";
 export default function ProfilePage() {
   const [player, setPlayer] = useState(null);
   const [state, setState] = useState("loading"); // loading | ok | guest | error
@@ -100,6 +101,7 @@ export default function ProfilePage() {
             <StatsCard player={player} />
             <div className="mb-5">
               <ThemePicker />
+              <AmbientSound />
             </div>
             <button
               onClick={copyLink}

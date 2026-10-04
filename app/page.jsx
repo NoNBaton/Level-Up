@@ -1,9 +1,11 @@
 "use client";
+
 import { sfx } from "./lib/sounds";
 import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "./components/ThemeContext";
-
+import LevelUpFlash from "./components/LevelUpFlash";
 import PushToggle from "./components/PushToggle";
+import { safeJson } from "@/lib/safeFetch";
 import {
   Plus,
   Trash2,
@@ -317,7 +319,7 @@ export default function HomePage() {
   const [selectedDayHistory, setSelectedDayHistory] = useState(null);
   const [unlockedAchievementNotification, setUnlockedAchievementNotification] =
     useState(null);
-
+  const [levelUpFlash, setLevelUpFlash] = useState(null);
   const playSound = (key) => {
     try {
       const map = {
@@ -485,7 +487,8 @@ export default function HomePage() {
       try {
         const res = await fetch("/api/me", { cache: "no-store" });
         if (res.ok) {
-          const data = await res.json();
+          const data = await safeJson(res);
+          if (!data) throw new Error("empty response");
           if (!cancelled && data.player) {
             loadedFor.current = data.player.authId;
             setProfile({
@@ -652,7 +655,7 @@ export default function HomePage() {
           ),
         },
       );
-      const data = await res.json().catch(() => ({}));
+      const data = (await safeJson(res)) || {};
 
       if (!res.ok) {
         setAuthError(String(data.error || "ОШИБКА СИСТЕМЫ"));
@@ -660,6 +663,10 @@ export default function HomePage() {
       }
 
       const player = data.player;
+      if (!player) {
+        setAuthError("ОШИБКА СИСТЕМЫ");
+        return;
+      }
       loadedFor.current = player.authId;
       setProfile({ name: player.nickname, authId: player.authId });
       hydrateFromPlayer(player);
@@ -736,6 +743,10 @@ export default function HomePage() {
     setXp(newXp);
     if (newLevel !== level) {
       setLevel(newLevel);
+      if (newLevel > level) {
+        setLevelUpFlash(newLevel);
+        setTimeout(() => setLevelUpFlash(null), 1150);
+      }
       if (level < 5 && newLevel >= 5) triggerAchievement("LEVEL_5");
       if (level < 25 && newLevel >= 25) triggerAchievement("LEVEL_25");
     }
@@ -753,7 +764,9 @@ export default function HomePage() {
       try {
         const res = await fetch("/api/rewards", { cache: "no-store" });
         if (!res.ok) return;
-        const { rewards } = await res.json();
+        const data = await safeJson(res);
+        if (!data) return;
+        const { rewards } = data;
         let totalXp = 0;
         const achs = [];
         for (const r of rewards || []) {
@@ -789,7 +802,10 @@ export default function HomePage() {
     const loadNotes = async () => {
       try {
         const res = await fetch("/api/notifications", { cache: "no-store" });
-        if (res.ok) setNotes(await res.json());
+        if (res.ok) {
+          const data = await safeJson(res);
+          if (data) setNotes(data);
+        }
       } catch {
         // ignore
       }
@@ -1118,6 +1134,7 @@ export default function HomePage() {
         onClose={() => setRecoveryOpen(false)}
         z="z-[110]"
       />
+      <LevelUpFlash active={!!levelUpFlash} level={levelUpFlash} />
       {/* Уведомление о достижении */}
       <AnimatePresence mode="wait">
         {unlockedAchievementNotification && (
