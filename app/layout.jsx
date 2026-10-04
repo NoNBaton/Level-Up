@@ -1,6 +1,6 @@
 import "./globals.css";
 import RegisterSW from "./register-sw";
-
+import { ThemeProvider } from "./components/ThemeContext";
 export const metadata = {
   title: "LEVEL_UP // OS",
   description: "Cyberpunk Productivity System",
@@ -19,7 +19,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ru">
       <body>
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
         <RegisterSW />
       </body>
     </html>

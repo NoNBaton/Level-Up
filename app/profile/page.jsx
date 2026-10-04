@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trophy, Copy, Check } from "lucide-react";
 import PlayerCard from "../components/PlayerCard";
-
+import ThemePicker from "../components/ThemePicker";
+import StatsCard from "../components/StatsCard";
 export default function ProfilePage() {
   const [player, setPlayer] = useState(null);
   const [state, setState] = useState("loading"); // loading | ok | guest | error
@@ -96,6 +97,10 @@ export default function ProfilePage() {
               editable
               onSaved={(v) => setPlayer((p) => ({ ...p, ...v }))}
             />
+            <StatsCard player={player} />
+            <div className="mb-5">
+              <ThemePicker />
+            </div>
             <button
               onClick={copyLink}
               className="w-full flex items-center justify-center gap-2 bg-slate-900/60 border border-cyan-500/30 text-cyan-300 py-2.5 rounded-xl text-xs tracking-wider uppercase hover:bg-cyan-950/40 transition cursor-pointer"

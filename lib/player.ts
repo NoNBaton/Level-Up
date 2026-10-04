@@ -53,6 +53,7 @@ type PlayerRow = {
   level: number;
   xp: number;
   streak: number;
+  longestStreak?: number; 
   rank: string;
   bio: string;
   avatar: string;
@@ -62,12 +63,15 @@ type PlayerRow = {
 };
 
 export function publicPlayer(p: PlayerRow) {
+  const prog = p.progress && typeof p.progress === "object" ? (p.progress as any) : {};
   return {
     nickname: p.nickname,
     authId: authIdFor(p.id),
     level: p.level,
     xp: p.xp,
     streak: p.streak,
+    longestStreak: (p as any).longestStreak ?? p.streak,
+    completedTotal: Number.isFinite(prog.completedTotal) ? prog.completedTotal : 0,
     rank: p.rank,
     bio: p.bio,
     avatar: p.avatar,

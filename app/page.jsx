@@ -1,6 +1,8 @@
 "use client";
 import { sfx } from "./lib/sounds";
 import React, { useState, useEffect, useRef } from "react";
+import { useTheme } from "./components/ThemeContext";
+
 import PushToggle from "./components/PushToggle";
 import {
   Plus,
@@ -268,7 +270,7 @@ const ACHIEVEMENT_ANIMATIONS = {
 export default function HomePage() {
   // Профиль: { name, authId }
   const [profile, setProfile] = useState(null);
-
+  const { theme } = useTheme();
   // Форма входа / регистрации
   const [authMode, setAuthMode] = useState("login");
   const [authName, setAuthName] = useState("");
@@ -1131,7 +1133,7 @@ export default function HomePage() {
           <div className="sys-flicker">
             <div className="sys-glow">
               <SystemFrame
-                tone="blue"
+                tone={theme}
                 glass
                 outer
                 className="p-4 sm:p-6 flex flex-col"

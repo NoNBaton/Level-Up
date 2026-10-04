@@ -41,3 +41,27 @@
 .animate-fadeIn {
     animation: fadeIn 0.15s ease-out forwards;
 }
+
+:root {
+    --accent: #5ecbff;
+    --accent-glow: 94, 203, 255;
+}
+
+/* Перекрашиваем все места, где раньше был хардкод cyan-синего, в переменную темы */
+.text-cyan-400 {
+    color: var(--accent) !important;
+}
+
+.border-\[\#5ecbff\]\/40,
+.border-\[\#5ecbff\]\/25,
+.border-\[\#5ecbff\]\/20,
+.border-\[\#5ecbff\]\/60,
+.border-\[\#5ecbff\]\/30 {
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+}
+
+.bg-\[\#5ecbff\]\/\[0\.04\],
+.bg-\[\#5ecbff\]\/10,
+.bg-\[\#5ecbff\]\/15 {
+    background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}

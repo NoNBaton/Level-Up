@@ -105,12 +105,14 @@ export async function PUT(req: Request) {
   }
 
   try {
+    const longestStreak = Math.max(current.longestStreak, streak);
     await prisma.player.update({
       where: { id },
       data: {
         level,
         xp,
         streak,
+        longestStreak,
         rank: getRank(level),
         achievements,
         progress,
