@@ -27,6 +27,14 @@ model Player {
   lastProgressAt      DateTime  @default(now())
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @default(now()) @updatedAt
+    coins               Int       @default(0)
+  statStr             Int       @default(0)
+  statAgi             Int       @default(0)
+  statVit             Int       @default(0)
+  statInt             Int       @default(0)
+    title               String    @default("")
+  frame               String    @default("frame_rank")
+  inventory           InventoryItem[]
   sentRequests      Friendship[] @relation("FriendRequester")
   receivedRequests  Friendship[] @relation("FriendAddressee")
   reactionsGiven    Reaction[]   @relation("ReactionFrom")
@@ -123,5 +131,17 @@ model PushSubscription {
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
+  @@index([playerId])
+}
+model InventoryItem {
+  id        String   @id @default(uuid())
+  playerId  String
+  itemId    String
+  source    String   @default("shop")
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, itemId])
   @@index([playerId])
 }

@@ -10,6 +10,44 @@ export const RECOVERY_QUESTIONS = [
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOCK_MINUTES = 15;
 
+// ---------- Характеристики ----------
+export const STAT_POINTS_PER_LEVEL = 3;
+
+export const STAT_FIELDS = {
+  str: "statStr",
+  agi: "statAgi",
+  vit: "statVit",
+  int: "statInt",
+} as const;
+
+export type StatKey = keyof typeof STAT_FIELDS;
+export const STAT_KEYS = Object.keys(STAT_FIELDS) as StatKey[];
+
+type StatRow = {
+  level: number;
+  statStr?: number;
+  statAgi?: number;
+  statVit?: number;
+  statInt?: number;
+};
+
+export function statsOf(p: StatRow) {
+  return {
+    str: p.statStr ?? 0,
+    agi: p.statAgi ?? 0,
+    vit: p.statVit ?? 0,
+    int: p.statInt ?? 0,
+  };
+}
+
+// Очки считаются от текущего уровня: заработано - потрачено.
+export function availableStatPoints(p: StatRow): number {
+  const s = statsOf(p);
+  const earned = Math.max(0, p.level - 1) * STAT_POINTS_PER_LEVEL;
+  const spent = s.str + s.agi + s.vit + s.int;
+  return Math.max(0, earned - spent);
+}
+
 export function normalizeAnswer(s: unknown): string {
   return String(s ?? "").trim().toLowerCase();
 }
@@ -53,13 +91,20 @@ type PlayerRow = {
   level: number;
   xp: number;
   streak: number;
-  longestStreak?: number; 
+  longestStreak?: number;
   rank: string;
   bio: string;
   avatar: string;
+    title?: string;
+  frame?: string;
   achievements: string[];
   progress: unknown;
   createdAt: Date;
+  coins?: number;
+  statStr?: number;
+  statAgi?: number;
+  statVit?: number;
+  statInt?: number;
 };
 
 export function publicPlayer(p: PlayerRow) {
@@ -78,9 +123,18 @@ export function publicPlayer(p: PlayerRow) {
     achievements: p.achievements,
     createdAt: p.createdAt,
     history: weeklyHistory(p.progress),
+    stats: statsOf(p),
+        stats: statsOf(p),
+    title: p.title ?? "",
+    frame: p.frame ?? "frame_rank",
   };
 }
 
 export function privatePlayer(p: PlayerRow) {
-  return { ...publicPlayer(p), progress: p.progress };
+  return {
+    ...publicPlayer(p),
+    progress: p.progress,
+    coins: p.coins ?? 0,
+    statPoints: availableStatPoints(p),
+  };
 }

@@ -10,6 +10,12 @@ const BOOT_LINES = [
   "СИНХРОНИЗАЦИЯ С СЕРВЕРОМ...",
 ];
 
+const AWAKEN_LINES = [
+  "[СИСТЕМА]: ОБНАРУЖЕН ЗАРЕГИСТРИРОВАННЫЙ ИГРОК.",
+  "[СИСТЕМА]: ДОБРО ПОЖАЛОВАТЬ ОБРАТНО, ОХОТНИК.",
+  "[СИСТЕМА]: ПРОВЕРКА СТАТУСА... ЗАВЕРШЕНО.",
+];
+
 function GlitchText({ text, className, style }) {
   const [display, setDisplay] = useState(text);
 
@@ -39,10 +45,76 @@ function GlitchText({ text, className, style }) {
   );
 }
 
+function TypewriterLines({ lines, onDone }) {
+  const [shown, setShown] = useState([]);
+  const [current, setCurrent] = useState("");
+
+  useEffect(() => {
+    let lineIdx = 0;
+    let charIdx = 0;
+    let cancelled = false;
+
+    const typeChar = () => {
+      if (cancelled) return;
+      if (lineIdx >= lines.length) {
+        setTimeout(() => !cancelled && onDone?.(), 400);
+        return;
+      }
+      const line = lines[lineIdx];
+      if (charIdx <= line.length) {
+        setCurrent(line.slice(0, charIdx));
+        charIdx++;
+        setTimeout(typeChar, 18 + Math.random() * 22);
+      } else {
+        setShown((s) => [...s, line]);
+        setCurrent("");
+        lineIdx++;
+        charIdx = 0;
+        setTimeout(typeChar, 350);
+      }
+    };
+
+    const start = setTimeout(typeChar, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(start);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="w-full max-w-sm text-center space-y-1.5 min-h-[4.5em]">
+      {shown.map((l, i) => (
+        <div
+          key={i}
+          className="text-[11px] sm:text-xs text-[#9fd0ff] tracking-widest uppercase"
+        >
+          {l}
+        </div>
+      ))}
+      {current && (
+        <div className="text-[11px] sm:text-xs text-[#9fd0ff] tracking-widest uppercase">
+          {current}
+          <span className="boot-cursor">_</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // powerOn=false: экран "идёт загрузка". powerOn=true: эпичное открытие системы.
-export default function BootScreen({ powerOn = false }) {
+export default function BootScreen({
+  powerOn = false,
+  awaken = false,
+  onAwakenDone,
+}) {
   const [lineIndex, setLineIndex] = useState(0);
   const [pct, setPct] = useState(4);
+  const [awakenDone, setAwakenDone] = useState(false);
+
+  useEffect(() => {
+    setAwakenDone(!awaken);
+  }, [awaken]);
 
   useEffect(() => {
     if (powerOn) return;
@@ -111,27 +183,37 @@ export default function BootScreen({ powerOn = false }) {
               style={{ textShadow: "0 0 10px #3b9dff, 0 0 24px #3b9dff" }}
             />
           </div>
+          {awaken && !awakenDone && (
+            <TypewriterLines
+              lines={AWAKEN_LINES}
+              onDone={() => {
+                setAwakenDone(true);
+                onAwakenDone?.();
+              }}
+            />
+          )}
 
-          <div className="w-full max-w-xs">
-            <div className="h-2 border border-[#3b9dff]/50 bg-[#020817]/70 p-0.5">
-              <div
-                className="h-full transition-all duration-200"
-                style={{
-                  width: `${pct}%`,
-                  background: "linear-gradient(90deg,#3b9dff,#dff0ff)",
-                  boxShadow: "0 0 10px #3b9dff",
-                }}
-              />
+          {awakenDone && (
+            <div className="w-full max-w-xs">
+              <div className="h-2 border border-[#3b9dff]/50 bg-[#020817]/70 p-0.5">
+                <div
+                  className="h-full transition-all duration-200"
+                  style={{
+                    width: `${pct}%`,
+                    background: "linear-gradient(90deg,#3b9dff,#dff0ff)",
+                    boxShadow: "0 0 10px #3b9dff",
+                  }}
+                />
+              </div>
+              <div className="mt-2 text-[10px] text-[#8fb6e6] tracking-widest text-right">
+                {Math.floor(pct)}%
+              </div>
+              <div className="text-[10px] sm:text-xs text-[#9fd0ff] tracking-widest uppercase text-center min-h-[1.4em]">
+                {BOOT_LINES[lineIndex]}
+                <span className="boot-cursor">_</span>
+              </div>
             </div>
-            <div className="mt-2 text-[10px] text-[#8fb6e6] tracking-widest text-right">
-              {Math.floor(pct)}%
-            </div>
-          </div>
-
-          <div className="text-[10px] sm:text-xs text-[#9fd0ff] tracking-widest uppercase text-center min-h-[1.4em]">
-            {BOOT_LINES[lineIndex]}
-            <span className="boot-cursor">_</span>
-          </div>
+          )}
         </div>
       )}
 

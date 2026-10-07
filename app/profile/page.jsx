@@ -6,6 +6,10 @@ import { ArrowLeft, Trophy, Copy, Check } from "lucide-react";
 import PlayerCard from "../components/PlayerCard";
 import ThemePicker from "../components/ThemePicker";
 import StatsCard from "../components/StatsCard";
+import HunterIdCard from "../components/HunterIdCard";
+import StatsPanel from "../components/StatsPanel";
+import ExportButton from "../components/ExportButton";
+import CosmeticsPanel from "../components/CosmeticsPanel";
 import AmbientSound from "../components/AmbientSound";
 export default function ProfilePage() {
   const [player, setPlayer] = useState(null);
@@ -98,6 +102,15 @@ export default function ProfilePage() {
               editable
               onSaved={(v) => setPlayer((p) => ({ ...p, ...v }))}
             />
+            <HunterIdCard player={player} />
+            <StatsPanel
+              player={player}
+              onChange={(v) => setPlayer((p) => ({ ...p, ...v }))}
+            />
+            <CosmeticsPanel
+              player={player}
+              onChange={(v) => setPlayer((p) => ({ ...p, ...v }))}
+            />
             <StatsCard player={player} />
             <div className="mb-5">
               <ThemePicker />
@@ -114,6 +127,7 @@ export default function ProfilePage() {
               )}
               {copied ? "ССЫЛКА СКОПИРОВАНА" : "СКОПИРОВАТЬ ССЫЛКУ НА ПРОФИЛЬ"}
             </button>
+            <ExportButton />
           </>
         )}
       </main>

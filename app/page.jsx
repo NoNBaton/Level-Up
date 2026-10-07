@@ -4,6 +4,7 @@ import { sfx } from "./lib/sounds";
 import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "./components/ThemeContext";
 import LevelUpFlash from "./components/LevelUpFlash";
+import RankUpFlash from "./components/RankUpFlash";
 import PushToggle from "./components/PushToggle";
 import { safeJson } from "@/lib/safeFetch";
 import {
@@ -50,6 +51,8 @@ import {
   BOSS_DAMAGE_PER_QUEST,
   PENALTY_XP,
   CATEGORY_META,
+  ANOMALY_XP,
+  ANOMALY_BOSS_DAMAGE,
 } from "@/lib/quests";
 const SOUNDS = {
   openModal: "/sounds/open.mp3",
@@ -272,6 +275,13 @@ const ACHIEVEMENT_ANIMATIONS = {
 export default function HomePage() {
   // Профиль: { name, authId }
   const [profile, setProfile] = useState(null);
+  const [awakenShown] = useState(() => {
+    try {
+      return sessionStorage.getItem("levelup_awake_shown") === "1";
+    } catch {
+      return false;
+    }
+  });
   const { theme } = useTheme();
   // Форма входа / регистрации
   const [authMode, setAuthMode] = useState("login");
@@ -320,6 +330,7 @@ export default function HomePage() {
   const [unlockedAchievementNotification, setUnlockedAchievementNotification] =
     useState(null);
   const [levelUpFlash, setLevelUpFlash] = useState(null);
+  const [rankUpFlash, setRankUpFlash] = useState(null);
   const playSound = (key) => {
     try {
       const map = {
@@ -334,14 +345,30 @@ export default function HomePage() {
     } catch {
       // ignore
     }
-  }; // ---------- Экран загрузки: минимум показывается 1.1с, потом «включение» ----------
+  };
+
+  // ---------- Экран загрузки: минимум показывается 1.1с, потом «включение» ----------
+  const willAwaken = !!profile && !awakenShown;
+
+  // Помечаем «пробуждение» показанным сразу, а не по окончании
+  useEffect(() => {
+    if (willAwaken && bootPhase !== "done") {
+      try {
+        sessionStorage.setItem("levelup_awake_shown", "1");
+      } catch {
+        // ignore
+      }
+    }
+  }, [willAwaken, bootPhase]);
+
   useEffect(() => {
     if (!isLoaded || bootPhase !== "loading") return;
     const elapsed = Date.now() - bootStartRef.current;
-    const wait = Math.max(0, 1100 - elapsed);
+    const minTime = willAwaken ? 4200 : 1100;
+    const wait = Math.max(0, minTime - elapsed);
     const t = setTimeout(() => setBootPhase("poweron"), wait);
     return () => clearTimeout(t);
-  }, [isLoaded, bootPhase]);
+  }, [isLoaded, bootPhase, willAwaken]);
 
   useEffect(() => {
     if (bootPhase !== "poweron") return;
@@ -350,7 +377,6 @@ export default function HomePage() {
   }, [bootPhase]);
 
   // ---------- Загрузка / сброс состояния ----------
-
   const hydrateFromPlayer = (player) => {
     let src = player;
     const hasServerProgress =
@@ -426,7 +452,9 @@ export default function HomePage() {
         streakFromSrc = 0;
       }
       loadedDailyQuests = generateDailyQuests(streakFromSrc);
-    } // Босс недели
+    }
+
+    // Босс недели
     const weekStart = getWeekMonday();
     const savedBoss =
       prog.boss && typeof prog.boss === "object" ? prog.boss : null;
@@ -744,8 +772,15 @@ export default function HomePage() {
     if (newLevel !== level) {
       setLevel(newLevel);
       if (newLevel > level) {
-        setLevelUpFlash(newLevel);
-        setTimeout(() => setLevelUpFlash(null), 1150);
+        const oldRank = getHunterRank(level).rank;
+        const newRank = getHunterRank(newLevel).rank;
+        if (newRank !== oldRank) {
+          setRankUpFlash(newRank);
+          setTimeout(() => setRankUpFlash(null), 2600);
+        } else {
+          setLevelUpFlash(newLevel);
+          setTimeout(() => setLevelUpFlash(null), 1150);
+        }
       }
       if (level < 5 && newLevel >= 5) triggerAchievement("LEVEL_5");
       if (level < 25 && newLevel >= 25) triggerAchievement("LEVEL_25");
@@ -892,9 +927,14 @@ export default function HomePage() {
       setCompletedTotal((c) => Math.max(0, c - 1));
     }
   };
+
   const toggleDailyQuest = (id) => {
     const quest = dailyQuests.find((q) => q.id === id);
     if (!quest) return;
+
+    const isAnomaly = quest.id === "anomaly";
+    const reward = isAnomaly ? ANOMALY_XP : xpPerTask;
+    const damage = isAnomaly ? ANOMALY_BOSS_DAMAGE : BOSS_DAMAGE_PER_QUEST;
 
     const isNowCompleted = !quest.completed;
     setDailyQuests((prev) =>
@@ -902,29 +942,30 @@ export default function HomePage() {
     );
 
     if (isNowCompleted) {
-      playSound(SOUNDS.completeTask);
-      changeXp(xpPerTask);
+      playSound(isAnomaly ? SOUNDS.epicAchievement : SOUNDS.completeTask);
+      changeXp(reward);
       setCompletedTotal((c) => c + 1);
       triggerAchievement("FIRST_TASK");
       bumpStreak();
       setBoss((prev) => {
         if (!prev) return prev;
-        const hp = Math.max(0, prev.hp - BOSS_DAMAGE_PER_QUEST);
+        const hp = Math.max(0, prev.hp - damage);
         const justDefeated = hp === 0 && !prev.defeated;
         if (justDefeated) triggerAchievement("BOSS_DEFEATED");
         return { ...prev, hp, defeated: prev.defeated || hp === 0 };
       });
     } else {
       playSound(SOUNDS.closeModal);
-      changeXp(-xpPerTask);
+      changeXp(-reward);
       setCompletedTotal((c) => Math.max(0, c - 1));
       setBoss((prev) => {
         if (!prev) return prev;
-        const hp = Math.min(prev.maxHp, prev.hp + BOSS_DAMAGE_PER_QUEST);
+        const hp = Math.min(prev.maxHp, prev.hp + damage);
         return { ...prev, hp, defeated: hp === 0 ? prev.defeated : false };
       });
     }
   };
+
   const handleFinishDay = () => {
     const uncompleted = tasks.filter((t) => !t.completed);
     if (uncompleted.length > 0) {
@@ -946,9 +987,20 @@ export default function HomePage() {
   };
 
   // ---------- Отрисовка ----------
-
   if (bootPhase !== "done") {
-    return <BootScreen powerOn={bootPhase === "poweron"} />;
+    return (
+      <BootScreen
+        powerOn={bootPhase === "poweron"}
+        awaken={willAwaken}
+        onAwakenDone={() => {
+          try {
+            sessionStorage.setItem("levelup_awake_shown", "1");
+          } catch {
+            // ignore
+          }
+        }}
+      />
+    );
   }
 
   // Уведомление о достижении в стиле системного окна
@@ -1135,6 +1187,7 @@ export default function HomePage() {
         z="z-[110]"
       />
       <LevelUpFlash active={!!levelUpFlash} level={levelUpFlash} />
+      <RankUpFlash active={!!rankUpFlash} rank={rankUpFlash} />
       {/* Уведомление о достижении */}
       <AnimatePresence mode="wait">
         {unlockedAchievementNotification && (
@@ -1343,11 +1396,21 @@ export default function HomePage() {
                 {/* Ежедневные авто-квесты */}
                 <section className="mb-5">
                   <SysSubtitle>ЕЖЕДНЕВНЫЕ КВЕСТЫ</SysSubtitle>
+                  {dailyQuests.some((q) => q.id === "anomaly") && (
+                    <div className="mt-3 border border-fuchsia-400/60 bg-fuchsia-400/10 p-2 text-center text-[11px] font-bold tracking-[0.2em] text-fuchsia-200 animate-pulse">
+                      ⚠ АНОМАЛИЯ ОБНАРУЖЕНА · НАГРАДА +{ANOMALY_XP} XP
+                    </div>
+                  )}
                   <div className="mt-3 space-y-2">
                     {dailyQuests.map((q) => {
                       const meta = CATEGORY_META[q.category] || {};
+                      const isAnomaly = q.id === "anomaly";
                       const Icon =
-                        meta.icon === "BookOpen" ? BookOpen : Dumbbell;
+                        meta.icon === "BookOpen"
+                          ? BookOpen
+                          : meta.icon === "Zap"
+                            ? Zap
+                            : Dumbbell;
                       return (
                         <div
                           key={q.id}
@@ -1363,11 +1426,19 @@ export default function HomePage() {
                           className={`flex items-center gap-2.5 border px-2.5 py-2 cursor-pointer ${
                             q.completed
                               ? "border-emerald-400/30 bg-emerald-400/5"
-                              : "border-[#5ecbff]/25 bg-[#5ecbff]/[0.04]"
+                              : isAnomaly
+                                ? "border-fuchsia-400/60 bg-fuchsia-400/10 shadow-[0_0_12px_rgba(217,70,239,0.35)]"
+                                : "border-[#5ecbff]/25 bg-[#5ecbff]/[0.04]"
                           }`}
                         >
                           <Icon
-                            className={`w-4 h-4 shrink-0 ${q.completed ? "text-emerald-300" : "text-[#5ecbff]"}`}
+                            className={`w-4 h-4 shrink-0 ${
+                              q.completed
+                                ? "text-emerald-300"
+                                : isAnomaly
+                                  ? "text-fuchsia-300"
+                                  : "text-[#5ecbff]"
+                            }`}
                           />
                           <div
                             className={`flex-1 min-w-0 ${q.completed ? "line-through opacity-70" : ""}`}

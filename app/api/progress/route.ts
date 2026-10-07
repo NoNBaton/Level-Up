@@ -11,10 +11,14 @@ function clampInt(v: unknown, min: number, max: number): number {
 }
 
 function doneCount(list: unknown): number {
-  return Array.isArray(list)
-    ? list.filter((q: any) => q && q.completed === true).length
-    : 0;
+  if (!Array.isArray(list)) return 0;
+  return list.reduce(
+    (sum: number, q: any) =>
+      q && q.completed === true ? sum + (q.id === "anomaly" ? 4 : 1) : sum,
+    0,
+  );
 }
+
 
 export async function PUT(req: Request) {
   const id = await getSessionPlayerId();
