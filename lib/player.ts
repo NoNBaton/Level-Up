@@ -124,7 +124,6 @@ export function publicPlayer(p: PlayerRow) {
     createdAt: p.createdAt,
     history: weeklyHistory(p.progress),
     stats: statsOf(p),
-        stats: statsOf(p),
     title: p.title ?? "",
     frame: p.frame ?? "frame_rank",
   };
