@@ -17,6 +17,8 @@ export async function GET() {
       streak: true,
       rank: true,
       avatar: true,
+      title: true,
+      pet: true,
     },
   });
 

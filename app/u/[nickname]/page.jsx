@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Trophy } from "lucide-react";
 import PlayerCard from "../../components/PlayerCard";
+import HunterIdCard from "../../components/HunterIdCard";
 import FriendActions from "../../components/FriendActions";
 export default function PublicProfilePage() {
   const params = useParams();
@@ -93,6 +94,7 @@ export default function PublicProfilePage() {
           <>
             <FriendActions nickname={player.nickname} />
             <PlayerCard player={player} />
+            <HunterIdCard player={player} />
           </>
         )}
       </main>

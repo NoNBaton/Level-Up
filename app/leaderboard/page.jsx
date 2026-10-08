@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trophy, Flame, Crown } from "lucide-react";
 import { AVATAR_STYLES, rankStyle } from "../components/PlayerCard";
+import { ITEM_BY_ID } from "@/lib/items";
 
 const PLACE_STYLES = [
   "border-amber-400/70 bg-amber-950/30 shadow-[0_0_20px_rgba(251,191,36,0.25)]",
@@ -115,6 +116,9 @@ export default function LeaderboardPage() {
                     >
                       {String(p.nickname).charAt(0)}
                     </div>
+                    {p.pet && ITEM_BY_ID[p.pet]?.emoji && (
+                      <span className="ml-1">{ITEM_BY_ID[p.pet].emoji}</span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold text-white truncate tracking-wider">
                         {p.nickname}
@@ -124,6 +128,11 @@ export default function LeaderboardPage() {
                           </span>
                         )}
                       </div>
+                      {p.title && ITEM_BY_ID[p.title] && (
+                        <div className="text-[9px] text-amber-300/90 tracking-[0.15em] uppercase truncate">
+                          « {ITEM_BY_ID[p.title].name} »
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5">
                         <span
                           className={`px-1.5 py-px rounded border text-[8px] font-black tracking-widest ${rankStyle(p.rank)}`}

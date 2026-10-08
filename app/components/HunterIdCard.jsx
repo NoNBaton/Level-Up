@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+const PetViewer = dynamic(() => import("./PetViewer"), { ssr: false });
 import {
   Maximize2,
   X,
@@ -77,9 +79,8 @@ function CardFace({ player }) {
   const xp = Number(player.xp) || 0;
   const streak = Number(player.streak) || 0;
   const best = Math.max(Number(player.longestStreak) || 0, streak);
-  const done = Number.isFinite(player.progress?.completedTotal)
-    ? player.progress.completedTotal
-    : 0;
+  const rawDone = player.completedTotal ?? player.progress?.completedTotal;
+  const done = Number.isFinite(rawDone) ? rawDone : 0;
   const ach = Array.isArray(player.achievements)
     ? player.achievements.length
     : 0;
@@ -141,6 +142,14 @@ function CardFace({ player }) {
           >
             {name.charAt(0).toUpperCase()}
           </span>
+          {player.pet && (
+            <div
+              aria-hidden
+              className="absolute -left-6 -bottom-6 w-20 h-20 z-10 pointer-events-none"
+            >
+              <PetViewer petId={player.pet} />
+            </div>
+          )}
           <span
             className="absolute bottom-0 inset-x-0 text-center text-[8px] tracking-widest py-0.5 font-bold text-black"
             style={{ background: rank.color }}

@@ -34,6 +34,7 @@ model Player {
   statInt             Int       @default(0)
     title               String    @default("")
   frame               String    @default("frame_rank")
+    pet                 String    @default("")
   inventory           InventoryItem[]
   sentRequests      Friendship[] @relation("FriendRequester")
   receivedRequests  Friendship[] @relation("FriendAddressee")

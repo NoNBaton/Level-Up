@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ITEM_BY_ID } from "@/lib/items";
 import {
   ShieldAlert,
   Flame,
@@ -105,6 +106,7 @@ export default function PlayerCard({ player, editable = false, onSaved }) {
   return (
     <div className="space-y-4">
       {/* Шапка */}
+      {/* Шапка */}
       <div className="bg-gradient-to-r from-slate-900/90 to-cyan-950/40 border border-cyan-500/30 rounded-2xl p-4 flex items-center gap-4">
         <div
           className={`w-16 h-16 shrink-0 rounded-2xl border-2 flex items-center justify-center text-2xl font-black ${avatarClass}`}
@@ -112,12 +114,18 @@ export default function PlayerCard({ player, editable = false, onSaved }) {
           {String(player.nickname).charAt(0)}
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-black text-white tracking-widest truncate">
-            {player.nickname}
-          </h1>
+          {player.nickname}
+          {player.pet && ITEM_BY_ID[player.pet]?.emoji && (
+            <span className="ml-2">{ITEM_BY_ID[player.pet].emoji}</span>
+          )}
           <div className="text-[10px] text-cyan-500 tracking-widest">
             {player.authId}
           </div>
+          {player.title && ITEM_BY_ID[player.title] && (
+            <div className="text-[10px] text-amber-300 tracking-[0.2em] uppercase mt-0.5 truncate">
+              « {ITEM_BY_ID[player.title].name} »
+            </div>
+          )}
           <div
             className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded border text-[10px] font-black tracking-widest ${rankStyle(player.rank)}`}
           >
@@ -127,6 +135,7 @@ export default function PlayerCard({ player, editable = false, onSaved }) {
         </div>
       </div>
 
+      {/* Статы */}
       {/* Статы */}
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-slate-900/60 border border-cyan-500/20 rounded-xl p-3 text-center">

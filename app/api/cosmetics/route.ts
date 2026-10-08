@@ -27,6 +27,7 @@ export async function GET() {
     owned: Array.from(owned),
     frame: p.frame,
     title: p.title,
+    pet: p.pet,
   });
 }
 
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
   const slot = body?.slot;
   const itemId = typeof body?.itemId === "string" ? body.itemId : "";
 
-  if (slot !== "frame" && slot !== "title") {
+  if (slot !== "frame" && slot !== "title" && slot !== "pet") {
     return NextResponse.json({ error: "НЕВЕРНЫЙ ЗАПРОС" }, { status: 400 });
   }
 
@@ -49,11 +50,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "НЕ АВТОРИЗОВАН" }, { status: 401 });
   }
 
+  const current = { frame: p.frame, title: p.title, pet: p.pet };
+
   try {
-    // Снять титул
-    if (slot === "title" && itemId === "") {
-      await prisma.player.update({ where: { id }, data: { title: "" } });
-      return NextResponse.json({ status: "ok", frame: p.frame, title: "" });
+    // Снять титул или питомца
+    if ((slot === "title" || slot === "pet") && itemId === "") {
+      await prisma.player.update({ where: { id }, data: { [slot]: "" } as any });
+      return NextResponse.json({ status: "ok", ...current, [slot]: "" });
     }
 
     const item = ITEM_BY_ID[itemId];
@@ -71,14 +74,10 @@ export async function POST(req: Request) {
 
     await prisma.player.update({
       where: { id },
-      data: slot === "frame" ? { frame: itemId } : { title: itemId },
+      data: { [slot]: itemId } as any,
     });
 
-    return NextResponse.json({
-      status: "ok",
-      frame: slot === "frame" ? itemId : p.frame,
-      title: slot === "title" ? itemId : p.title,
-    });
+    return NextResponse.json({ status: "ok", ...current, [slot]: itemId });
   } catch (error) {
     console.error(
       "cosmetics error:",
@@ -86,4 +85,4 @@ export async function POST(req: Request) {
     );
     return NextResponse.json({ error: "ОШИБКА СОХРАНЕНИЯ" }, { status: 500 });
   }
-}   
+}

@@ -27,6 +27,7 @@ import {
   Skull,
   Users,
   BellRing,
+  Coins,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -302,6 +303,7 @@ export default function HomePage() {
   const [tasks, setTasks] = useState([]);
   const [dailyQuests, setDailyQuests] = useState([]);
   const [boss, setBoss] = useState(null);
+  const [coins, setCoins] = useState(0);
   const [history, setHistory] = useState([]);
   const [unlockedAchievements, setUnlockedAchievements] = useState([]);
   const [newTaskText, setNewTaskText] = useState("");
@@ -464,6 +466,7 @@ export default function HomePage() {
         : freshBoss(weekStart);
 
     unlockedRef.current = achievements;
+    setCoins(Number(src.coins) || 0);
     setLevel(Number(src.level) || 1);
     setXp(xpFromSrc);
     setStreak(streakFromSrc);
@@ -482,6 +485,7 @@ export default function HomePage() {
     payloadRef.current = null;
     clearTimeout(saveTimer.current);
     unlockedRef.current = [];
+    setCoins(0);
     setLevel(1);
     setXp(0);
     setStreak(0);
@@ -581,6 +585,8 @@ export default function HomePage() {
       }
       if (res.ok) {
         setSyncState("saved");
+        const saved = await safeJson(res).catch(() => null);
+        if (saved && Number.isFinite(saved.coins)) setCoins(saved.coins);
       } else {
         dirtyRef.current = true;
         setSyncState("error");
@@ -1577,6 +1583,16 @@ export default function HomePage() {
                       ДРУЗЬЯ
                     </span>
                     <span className="text-[10px] opacity-70">→</span>
+                  </Link>
+                  <Link
+                    href="/shop"
+                    className="sys-title col-span-2 flex items-center justify-between border border-amber-400/60 bg-amber-400/10 hover:bg-amber-400 hover:text-slate-950 text-amber-200 py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Coins className="w-4 h-4" />
+                      МАГАЗИН
+                    </span>
+                    <span className="text-[10px] opacity-90">◈ {coins}</span>
                   </Link>
                 </div>
 

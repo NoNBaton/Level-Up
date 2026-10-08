@@ -3,11 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { Lock, Check } from "lucide-react";
 import { ITEMS, RARITY_COLOR, SOURCE_HINT } from "@/lib/items";
+import ItemPreview from "./ItemPreview";
 
 export default function CosmeticsPanel({ player, onChange }) {
   const [owned, setOwned] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [preview, setPreview] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +43,7 @@ export default function CosmeticsPanel({ player, onChange }) {
         setError(String(data?.error || "ОШИБКА СИСТЕМЫ"));
         return;
       }
-      onChange?.({ frame: data.frame, title: data.title });
+      onChange?.({ frame: data.frame, title: data.title, pet: data.pet });
     } catch {
       setError("НЕТ СВЯЗИ С СЕРВЕРОМ");
     } finally {
@@ -49,35 +51,45 @@ export default function CosmeticsPanel({ player, onChange }) {
     }
   };
 
-  const equippedFrame = player?.frame || "frame_rank";
-  const equippedTitle = player?.title || "";
+  const equippedOf = {
+    frame: player?.frame || "frame_rank",
+    title: player?.title || "",
+    pet: player?.pet || "",
+  };
 
   const Tile = ({ item }) => {
     const has = owned?.has(item.id);
-    const equipped =
-      item.type === "frame"
-        ? equippedFrame === item.id
-        : equippedTitle === item.id;
+    const equipped = equippedOf[item.type] === item.id;
     const color = item.color || RARITY_COLOR[item.rarity];
     return (
       <button
-        onClick={() => has && !equipped && equip(item.type, item.id)}
-        disabled={!has || busy}
-        className={`relative text-left border px-2 py-2 transition ${
-          has
-            ? "cursor-pointer hover:bg-white/5"
-            : "opacity-40 cursor-not-allowed"
+        onClick={() => setPreview(item)}
+        disabled={busy}
+        className={`relative text-left border px-2 py-2 transition flex items-center gap-2 cursor-pointer hover:bg-white/5 ${
+          has ? "" : "opacity-50"
         }`}
         style={{
           borderColor: equipped ? color : `${color}66`,
           boxShadow: equipped ? `0 0 10px ${color}88` : "none",
         }}
       >
-        <div className="text-[10px] font-bold tracking-wider text-white leading-tight pr-4">
-          {item.name}
-        </div>
-        <div className="text-[8px] tracking-widest mt-0.5" style={{ color }}>
-          {has ? (equipped ? "НАДЕТО" : "ВЫБРАТЬ") : SOURCE_HINT[item.source]}
+        {item.emoji && (
+          <span
+            className="text-2xl leading-none"
+            style={{
+              filter: has ? `drop-shadow(0 0 4px ${color})` : "grayscale(1)",
+            }}
+          >
+            {item.emoji}
+          </span>
+        )}
+        <div className="min-w-0 flex-1 pr-3">
+          <div className="text-[10px] font-bold tracking-wider text-white leading-tight">
+            {item.name}
+          </div>
+          <div className="text-[8px] tracking-widest mt-0.5" style={{ color }}>
+            {has ? (equipped ? "НАДЕТО" : "ВЫБРАТЬ") : SOURCE_HINT[item.source]}
+          </div>
         </div>
         <div className="absolute top-1.5 right-1.5" style={{ color }}>
           {has ? (
@@ -92,7 +104,44 @@ export default function CosmeticsPanel({ player, onChange }) {
     );
   };
 
+  const NoneTile = ({ slot, label }) => {
+    const active = equippedOf[slot] === "";
+    return (
+      <button
+        onClick={() => !active && equip(slot, "")}
+        disabled={busy}
+        className="text-left border px-2 py-2 cursor-pointer hover:bg-white/5"
+        style={{ borderColor: active ? "#94a3b8" : "#94a3b866" }}
+      >
+        <div className="text-[10px] font-bold tracking-wider text-white">
+          {label}
+        </div>
+        <div className="text-[8px] tracking-widest mt-0.5 text-slate-400">
+          {active ? "НАДЕТО" : "ВЫБРАТЬ"}
+        </div>
+      </button>
+    );
+  };
+
+  const Section = ({ title, items, none }) => {
+    const have = items.filter((i) => owned?.has(i.id)).length;
+    return (
+      <div className="mb-4 last:mb-0">
+        <div className="text-[9px] tracking-[0.2em] text-[#5f86b3] mb-1.5">
+          {title} · {have}/{items.length}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {none}
+          {items.map((it) => (
+            <Tile key={it.id} item={it} />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const frames = ITEMS.filter((i) => i.type === "frame");
+  const pets = ITEMS.filter((i) => i.type === "pet");
   const titles = ITEMS.filter((i) => i.type === "title");
 
   return (
@@ -109,38 +158,17 @@ export default function CosmeticsPanel({ player, onChange }) {
 
       {owned && (
         <>
-          <div className="text-[9px] tracking-[0.2em] text-[#5f86b3] mb-1.5">
-            РАМКИ УДОСТОВЕРЕНИЯ
-          </div>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {frames.map((it) => (
-              <Tile key={it.id} item={it} />
-            ))}
-          </div>
-
-          <div className="text-[9px] tracking-[0.2em] text-[#5f86b3] mb-1.5">
-            ТИТУЛЫ
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => equippedTitle !== "" && equip("title", "")}
-              disabled={busy}
-              className="text-left border px-2 py-2 cursor-pointer hover:bg-white/5"
-              style={{
-                borderColor: equippedTitle === "" ? "#94a3b8" : "#94a3b866",
-              }}
-            >
-              <div className="text-[10px] font-bold tracking-wider text-white">
-                БЕЗ ТИТУЛА
-              </div>
-              <div className="text-[8px] tracking-widest mt-0.5 text-slate-400">
-                {equippedTitle === "" ? "НАДЕТО" : "ВЫБРАТЬ"}
-              </div>
-            </button>
-            {titles.map((it) => (
-              <Tile key={it.id} item={it} />
-            ))}
-          </div>
+          <Section
+            title="ПИТОМЦЫ"
+            items={pets}
+            none={<NoneTile slot="pet" label="БЕЗ ПИТОМЦА" />}
+          />
+          <Section title="РАМКИ УДОСТОВЕРЕНИЯ" items={frames} />
+          <Section
+            title="ТИТУЛЫ"
+            items={titles}
+            none={<NoneTile slot="title" label="БЕЗ ТИТУЛА" />}
+          />
         </>
       )}
 
@@ -149,6 +177,35 @@ export default function CosmeticsPanel({ player, onChange }) {
           {error}
         </div>
       )}
+
+      <ItemPreview
+        item={preview}
+        nickname={player?.nickname}
+        onClose={() => setPreview(null)}
+      >
+        {preview && owned?.has(preview.id) ? (
+          equippedOf[preview.type] === preview.id ? (
+            <div className="text-center text-[10px] tracking-widest text-emerald-300 border border-emerald-400/40 py-2">
+              УЖЕ НАДЕТО
+            </div>
+          ) : (
+            <button
+              onClick={async () => {
+                await equip(preview.type, preview.id);
+                setPreview(null);
+              }}
+              disabled={busy}
+              className="w-full text-[11px] font-bold tracking-wider border border-cyan-400 text-cyan-200 py-2 hover:bg-cyan-400 hover:text-slate-950 transition cursor-pointer"
+            >
+              НАДЕТЬ
+            </button>
+          )
+        ) : (
+          <div className="text-center text-[10px] tracking-widest text-slate-400 border border-slate-600/50 py-2">
+            НЕ ПОЛУЧЕНО · {preview ? SOURCE_HINT[preview.source] : ""}
+          </div>
+        )}
+      </ItemPreview>
     </div>
   );
 }

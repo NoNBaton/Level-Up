@@ -97,6 +97,7 @@ type PlayerRow = {
   avatar: string;
     title?: string;
   frame?: string;
+    pet?: string;
   achievements: string[];
   progress: unknown;
   createdAt: Date;
