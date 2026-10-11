@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
+import { randomInt } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSessionPlayerId } from "@/lib/session";
 import { getRank } from "@/lib/player";
 import { ACH_TITLES, autoTotalOf, weekStartUTC } from "@/lib/social";
 import { QUEST_DEFS, isAnomalyDay, getWeekMonday } from "@/lib/quests";
-import { QUEST_COINS, ANOMALY_COINS, BOSS_COINS } from "@/lib/economy";
+import {
+  QUEST_COINS,
+  ANOMALY_COINS,
+  BOSS_COINS,
+  ANOMALY_BOX_CHANCE,
+} from "@/lib/economy";
+import { applyCoins } from "@/lib/statEffects"; // ХАРАКТЕРИСТИКИ
 
 function clampInt(v: unknown, min: number, max: number): number {
   const n = Math.floor(Number(v));
@@ -124,7 +131,7 @@ export async function PUT(req: Request) {
       ? prevBase
       : { weekStart: week, base: prevAuto };
 
-  // ---------- Монеты: начисляет только сервер, один раз за квест ----------
+  // ---------- Монеты и лутбоксы: начисляет только сервер, один раз за квест ----------
   const prevClaims =
     prevProgress.coinClaims && typeof prevProgress.coinClaims === "object"
       ? prevProgress.coinClaims
@@ -145,6 +152,7 @@ export async function PUT(req: Request) {
     : [];
 
   let coinGain = 0;
+  let boxGain = 0;
   const claimDate =
     typeof progress.dailyQuestsDate === "string"
       ? progress.dailyQuestsDate
@@ -160,6 +168,7 @@ export async function PUT(req: Request) {
       if (q.id === "anomaly") {
         if (!isAnomalyDay(claimDate)) continue;
         coinGain += ANOMALY_COINS;
+        if (randomInt(100) < ANOMALY_BOX_CHANCE) boxGain += 1;
       } else if (QUEST_DEFS.some((d) => d.id === q.id)) {
         coinGain += QUEST_COINS;
       } else {
@@ -180,8 +189,12 @@ export async function PUT(req: Request) {
     !claimsBoss.includes(bossIn.weekStart)
   ) {
     coinGain += BOSS_COINS;
+    boxGain += 1;
     claimsBoss.push(bossIn.weekStart);
   }
+
+  // ХАРАКТЕРИСТИКИ: бонус AGI к монетам (по статам, сохранённым в базе)
+  if (coinGain > 0) coinGain = applyCoins(coinGain, current);
 
   // Клиентские значения coinClaims игнорируем, пишем только серверные
   progress.coinClaims = { daily: claimsDaily, boss: claimsBoss.slice(-6) };
@@ -204,6 +217,7 @@ export async function PUT(req: Request) {
         progress,
         lastProgressAt: new Date(),
         ...(coinGain > 0 ? { coins: { increment: coinGain } } : {}),
+        ...(boxGain > 0 ? { lootboxes: { increment: boxGain } } : {}),
       },
     });
 
@@ -243,6 +257,8 @@ export async function PUT(req: Request) {
       status: "ok",
       coins: updated.coins,
       coinGain,
+      lootboxes: updated.lootboxes,
+      boxGain,
     });
   } catch (error) {
     console.error(

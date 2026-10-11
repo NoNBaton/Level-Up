@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import CardBackground from "./CardBackground";
 const PetViewer = dynamic(() => import("./PetViewer"), { ssr: false });
 import {
   Maximize2,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ITEM_BY_ID, frameColors } from "@/lib/items";
+
 const RANKS = [
   { min: 25, letter: "S", color: "#ffd34d", glow: "255,211,77" },
   { min: 20, letter: "A", color: "#ff9f43", glow: "255,159,67" },
@@ -99,12 +101,15 @@ function CardFace({ player }) {
 
   return (
     <div
-      className="relative overflow-hidden border-2 bg-[#020817] p-4"
+      className="relative isolate overflow-hidden border-2 bg-[#020817] p-4"
       style={{
         borderColor: rank.color,
         boxShadow: `0 0 18px rgba(${rank.glow},0.55), inset 0 0 24px rgba(${rank.glow},0.12)`,
       }}
     >
+      {/* фон удостоверения */}
+      <CardBackground id={player.bg} glow={rank.glow} />
+
       {/* голографический блик */}
       <motion.div
         aria-hidden
@@ -258,7 +263,6 @@ function CardFace({ player }) {
         </div>
       )}
 
-      {/* печать */}
       {/* печать */}
       <div className="pointer-events-none absolute -bottom-3 -right-3 w-20 h-20 opacity-60 rotate-12">
         <Seal color={rank.color} />

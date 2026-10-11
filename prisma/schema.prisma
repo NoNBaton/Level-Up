@@ -27,15 +27,21 @@ model Player {
   lastProgressAt      DateTime  @default(now())
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @default(now()) @updatedAt
-    coins               Int       @default(0)
+
+  coins               Int       @default(0)
+  lootboxes           Int       @default(0)
+    lootboxesRare       Int       @default(0)
+  lootboxesLegendary  Int       @default(0)
   statStr             Int       @default(0)
   statAgi             Int       @default(0)
   statVit             Int       @default(0)
   statInt             Int       @default(0)
-    title               String    @default("")
+  title               String    @default("")
   frame               String    @default("frame_rank")
-    pet                 String    @default("")
+  pet                 String    @default("")
+    bg                  String    @default("")
   inventory           InventoryItem[]
+
   sentRequests      Friendship[] @relation("FriendRequester")
   receivedRequests  Friendship[] @relation("FriendAddressee")
   reactionsGiven    Reaction[]   @relation("ReactionFrom")
@@ -45,9 +51,11 @@ model Player {
   duelsStarted    Duel[]        @relation("DuelChallenger")
   duelsReceived   Duel[]        @relation("DuelOpponent")
   claims          RewardClaim[] @relation("PlayerClaims")
-    pushSubscriptions PushSubscription[]
+  pushSubscriptions PushSubscription[]
+
   @@index([level, xp])
 }
+
 model Friendship {
   id          String   @id @default(uuid())
   requesterId String
@@ -75,6 +83,7 @@ model Reaction {
   @@unique([fromId, toId])
   @@index([toId])
 }
+
 model Activity {
   id        String    @id @default(uuid())
   playerId  String
@@ -92,18 +101,18 @@ model Activity {
 }
 
 model Duel {
-  id             String    @id @default(uuid())
-  challengerId   String
-  opponentId     String
-  status         String    @default("pending") // pending | active | finished
-  challengerBase Int       @default(0)
-  opponentBase   Int       @default(0)
-  challengerScore Int      @default(0)
-  opponentScore  Int       @default(0)
-  startedAt      DateTime?
-  endsAt         DateTime?
-  winnerId       String?
-  createdAt      DateTime  @default(now())
+  id              String    @id @default(uuid())
+  challengerId    String
+  opponentId      String
+  status          String    @default("pending") // pending | active | finished
+  challengerBase  Int       @default(0)
+  opponentBase    Int       @default(0)
+  challengerScore Int       @default(0)
+  opponentScore   Int       @default(0)
+  startedAt       DateTime?
+  endsAt          DateTime?
+  winnerId        String?
+  createdAt       DateTime  @default(now())
 
   challenger Player @relation("DuelChallenger", fields: [challengerId], references: [id], onDelete: Cascade)
   opponent   Player @relation("DuelOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
@@ -122,6 +131,7 @@ model RewardClaim {
 
   @@unique([playerId, key])
 }
+
 model PushSubscription {
   id        String   @id @default(uuid())
   playerId  String
@@ -134,6 +144,7 @@ model PushSubscription {
 
   @@index([playerId])
 }
+
 model InventoryItem {
   id        String   @id @default(uuid())
   playerId  String

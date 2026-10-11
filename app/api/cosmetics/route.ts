@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getSessionPlayerId } from "@/lib/session";
 import { ITEM_BY_ID, ownedItemIds } from "@/lib/items";
 
+const SLOTS = ["frame", "title", "pet", "bg"];
+const CLEARABLE = ["title", "pet", "bg"];
+
 async function loadPlayer(id: string) {
   return prisma.player.findUnique({
     where: { id },
@@ -28,6 +31,7 @@ export async function GET() {
     frame: p.frame,
     title: p.title,
     pet: p.pet,
+    bg: p.bg,
   });
 }
 
@@ -38,10 +42,10 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null);
-  const slot = body?.slot;
+  const slot = typeof body?.slot === "string" ? body.slot : "";
   const itemId = typeof body?.itemId === "string" ? body.itemId : "";
 
-  if (slot !== "frame" && slot !== "title" && slot !== "pet") {
+  if (!SLOTS.includes(slot)) {
     return NextResponse.json({ error: "НЕВЕРНЫЙ ЗАПРОС" }, { status: 400 });
   }
 
@@ -50,11 +54,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "НЕ АВТОРИЗОВАН" }, { status: 401 });
   }
 
-  const current = { frame: p.frame, title: p.title, pet: p.pet };
+  const current = { frame: p.frame, title: p.title, pet: p.pet, bg: p.bg };
 
   try {
-    // Снять титул или питомца
-    if ((slot === "title" || slot === "pet") && itemId === "") {
+    // Снять титул, питомца или фон
+    if (CLEARABLE.includes(slot) && itemId === "") {
       await prisma.player.update({ where: { id }, data: { [slot]: "" } as any });
       return NextResponse.json({ status: "ok", ...current, [slot]: "" });
     }

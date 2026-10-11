@@ -95,13 +95,15 @@ type PlayerRow = {
   rank: string;
   bio: string;
   avatar: string;
-    title?: string;
+  title?: string;
   frame?: string;
-    pet?: string;
+  pet?: string;
+  bg?: string;
   achievements: string[];
   progress: unknown;
   createdAt: Date;
   coins?: number;
+  lootboxes?: number;
   statStr?: number;
   statAgi?: number;
   statVit?: number;
@@ -127,6 +129,8 @@ export function publicPlayer(p: PlayerRow) {
     stats: statsOf(p),
     title: p.title ?? "",
     frame: p.frame ?? "frame_rank",
+    pet: p.pet ?? "",
+    bg: p.bg ?? "",
   };
 }
 
@@ -135,6 +139,7 @@ export function privatePlayer(p: PlayerRow) {
     ...publicPlayer(p),
     progress: p.progress,
     coins: p.coins ?? 0,
+    lootboxes: p.lootboxes ?? 0,
     statPoints: availableStatPoints(p),
   };
 }

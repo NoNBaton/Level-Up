@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { applyBoss } from "@/lib/statEffects";
 
 export const TEAM_BOSS_HP_PER_MEMBER = 400;
 export const TEAM_BOSS_DAMAGE = 35;
@@ -77,7 +78,7 @@ export async function teamBossFor(me: string) {
   const ids = [me, ...(await friendIdsOf(me))];
   const players = await prisma.player.findMany({
     where: { id: { in: ids } },
-    select: { id: true, nickname: true, progress: true },
+    select: { id: true, nickname: true, progress: true, statStr: true },
   });
 
   const members = players
@@ -86,7 +87,7 @@ export async function teamBossFor(me: string) {
       return {
         nickname: p.nickname,
         quests,
-        damage: quests * TEAM_BOSS_DAMAGE,
+        damage: applyBoss(quests * TEAM_BOSS_DAMAGE, p),
         isMe: p.id === me,
       };
     })

@@ -11,6 +11,8 @@ import StatsPanel from "../components/StatsPanel";
 import ExportButton from "../components/ExportButton";
 import CosmeticsPanel from "../components/CosmeticsPanel";
 import AmbientSound from "../components/AmbientSound";
+import WeeklyReport from "../components/WeeklyReport";
+
 export default function ProfilePage() {
   const [player, setPlayer] = useState(null);
   const [state, setState] = useState("loading"); // loading | ok | guest | error
@@ -112,6 +114,7 @@ export default function ProfilePage() {
               onChange={(v) => setPlayer((p) => ({ ...p, ...v }))}
             />
             <StatsCard player={player} />
+            <WeeklyReport player={player} />
             <div className="mb-5">
               <ThemePicker />
               <AmbientSound />

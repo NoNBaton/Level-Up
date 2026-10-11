@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Lock, Check } from "lucide-react";
 import { ITEMS, RARITY_COLOR, SOURCE_HINT } from "@/lib/items";
 import ItemPreview from "./ItemPreview";
+import CardBackground from "./CardBackground"; // ФОНЫ
 
 export default function CosmeticsPanel({ player, onChange }) {
   const [owned, setOwned] = useState(null);
@@ -43,7 +44,12 @@ export default function CosmeticsPanel({ player, onChange }) {
         setError(String(data?.error || "ОШИБКА СИСТЕМЫ"));
         return;
       }
-      onChange?.({ frame: data.frame, title: data.title, pet: data.pet });
+      onChange?.({
+        frame: data.frame,
+        title: data.title,
+        pet: data.pet,
+        bg: data.bg, // ФОНЫ
+      });
     } catch {
       setError("НЕТ СВЯЗИ С СЕРВЕРОМ");
     } finally {
@@ -55,6 +61,7 @@ export default function CosmeticsPanel({ player, onChange }) {
     frame: player?.frame || "frame_rank",
     title: player?.title || "",
     pet: player?.pet || "",
+    bg: player?.bg || "", // ФОНЫ
   };
 
   const Tile = ({ item }) => {
@@ -82,6 +89,15 @@ export default function CosmeticsPanel({ player, onChange }) {
           >
             {item.emoji}
           </span>
+        )}
+        {/* ФОНЫ: миниатюра */}
+        {item.type === "bg" && (
+          <div
+            className="relative isolate w-10 h-10 shrink-0 border overflow-hidden"
+            style={{ borderColor: `${color}88` }}
+          >
+            <CardBackground id={item.id} glow="94,203,255" z="z-0" />
+          </div>
         )}
         <div className="min-w-0 flex-1 pr-3">
           <div className="text-[10px] font-bold tracking-wider text-white leading-tight">
@@ -143,6 +159,7 @@ export default function CosmeticsPanel({ player, onChange }) {
   const frames = ITEMS.filter((i) => i.type === "frame");
   const pets = ITEMS.filter((i) => i.type === "pet");
   const titles = ITEMS.filter((i) => i.type === "title");
+  const bgs = ITEMS.filter((i) => i.type === "bg"); // ФОНЫ
 
   return (
     <div className="border border-[#5ecbff]/40 bg-[#020817]/60 p-3">
@@ -164,6 +181,12 @@ export default function CosmeticsPanel({ player, onChange }) {
             none={<NoneTile slot="pet" label="БЕЗ ПИТОМЦА" />}
           />
           <Section title="РАМКИ УДОСТОВЕРЕНИЯ" items={frames} />
+          {/* ФОНЫ */}
+          <Section
+            title="ФОНЫ УДОСТОВЕРЕНИЯ"
+            items={bgs}
+            none={<NoneTile slot="bg" label="БЕЗ ФОНА" />}
+          />
           <Section
             title="ТИТУЛЫ"
             items={titles}

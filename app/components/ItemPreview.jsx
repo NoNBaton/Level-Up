@@ -4,6 +4,7 @@ import React from "react";
 import dynamic from "next/dynamic";
 import { X } from "lucide-react";
 import { RARITY_COLOR, SOURCE_HINT } from "@/lib/items";
+import CardBackground from "./CardBackground";
 
 const PetViewer = dynamic(() => import("./PetViewer"), { ssr: false });
 
@@ -88,6 +89,40 @@ export default function ItemPreview({
                 style={{ color }}
               >
                 « {item.name} »
+              </div>
+            </div>
+          )}
+
+          {item.type === "bg" && (
+            <div
+              className="relative isolate w-full h-full border overflow-hidden bg-[#020817]"
+              style={{
+                borderColor: color,
+                boxShadow: `0 0 18px ${color}55`,
+              }}
+            >
+              <CardBackground id={item.id} glow="94,203,255" z="z-0" />
+              <div className="relative z-10 h-full flex flex-col items-center justify-center gap-2">
+                <div
+                  className="w-16 h-20 border flex items-center justify-center text-3xl font-black text-white"
+                  style={{
+                    borderColor: "#5ecbff",
+                    background:
+                      "radial-gradient(circle at 50% 35%, rgba(94,203,255,0.35), rgba(2,8,23,0.85) 70%)",
+                    textShadow: "0 0 10px #5ecbff",
+                  }}
+                >
+                  {nickname.charAt(0).toUpperCase()}
+                </div>
+                <div className="text-xs font-bold text-white tracking-wider">
+                  {nickname}
+                </div>
+                <div
+                  className="text-[9px] tracking-widest"
+                  style={{ color: "#5ecbff" }}
+                >
+                  ID: 000000
+                </div>
               </div>
             </div>
           )}

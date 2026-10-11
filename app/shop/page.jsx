@@ -2,9 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Coins, Check } from "lucide-react";
+import { ArrowLeft, Coins, Check, Gift } from "lucide-react";
 import { ITEMS, RARITY_COLOR } from "@/lib/items";
+import { BOX_INFO, BOX_TIERS } from "@/lib/lootboxes";
 import ItemPreview from "../components/ItemPreview";
+import CardBackground from "../components/CardBackground";
+import LootboxPreview from "../components/LootboxPreview";
+
 const RARITY_LABEL = {
   common: "ОБЫЧНЫЙ",
   rare: "РЕДКИЙ",
@@ -16,9 +20,11 @@ export default function ShopPage() {
   const [state, setState] = useState("loading"); // loading | ok | guest | error
   const [coins, setCoins] = useState(0);
   const [owned, setOwned] = useState(new Set());
+  const [boxes, setBoxes] = useState({ normal: 0, rare: 0, legendary: 0 });
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState("");
   const [preview, setPreview] = useState(null);
+  const [boxPreview, setBoxPreview] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +40,16 @@ export default function ShopPage() {
         setState("ok");
       } catch {
         if (!cancelled) setState("error");
+      }
+      // количество коробок: не критично, если не загрузится
+      try {
+        const r2 = await fetch("/api/lootbox", { cache: "no-store" });
+        if (!cancelled && r2.ok) {
+          const d2 = await r2.json();
+          if (d2.boxes) setBoxes(d2.boxes);
+        }
+      } catch {
+        // ignore
       }
     })();
     return () => {
@@ -66,12 +82,81 @@ export default function ShopPage() {
     }
   };
 
+  const buyBox = async (tier) => {
+    if (busyId) return;
+    setBusyId(`box_${tier}`);
+    setMsg("");
+    try {
+      const res = await fetch("/api/lootbox/buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setMsg(String(data?.error || "ОШИБКА СИСТЕМЫ"));
+        return;
+      }
+      setCoins(data.coins);
+      setBoxes(data.boxes);
+      setMsg(
+        `КУПЛЕНО: ${BOX_INFO[tier].name}. ОТКРЫТЬ МОЖНО В РАЗДЕЛЕ ЛУТБОКСЫ`,
+      );
+    } catch {
+      setMsg("НЕТ СВЯЗИ С СЕРВЕРОМ");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const goods = ITEMS.filter((i) => i.source === "shop" && i.price).sort(
     (a, b) => a.price - b.price,
   );
   const pets = goods.filter((i) => i.type === "pet");
   const frames = goods.filter((i) => i.type === "frame");
   const titles = goods.filter((i) => i.type === "title");
+  const bgs = goods.filter((i) => i.type === "bg");
+
+  const BoxCard = ({ tier }) => {
+    const info = BOX_INFO[tier];
+    const canBuy = coins >= info.price;
+    return (
+      <div
+        onClick={() => setBoxPreview(tier)}
+        className="border cursor-pointer bg-[#020817]/70 p-2 flex flex-col gap-2"
+        style={{ borderColor: `${info.color}88` }}
+      >
+        <div
+          className="h-12 flex items-center justify-center"
+          style={{ filter: `drop-shadow(0 0 8px ${info.color})` }}
+        >
+          <Gift className="w-9 h-9" style={{ color: info.color }} />
+        </div>
+        <div>
+          <div className="text-[10px] font-bold text-white tracking-wider leading-tight">
+            {info.name}
+          </div>
+          <div
+            className="text-[8px] tracking-widest mt-0.5"
+            style={{ color: info.color }}
+          >
+            В НАЛИЧИИ: {boxes[tier] ?? 0}
+          </div>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            buyBox(tier);
+          }}
+          disabled={!canBuy || !!busyId}
+          className="flex items-center justify-center gap-1 text-[11px] font-bold tracking-wider border border-amber-400/70 text-amber-200 py-1.5 hover:bg-amber-400 hover:text-slate-950 transition disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
+        >
+          <Coins className="w-3.5 h-3.5" />
+          {busyId === `box_${tier}` ? "..." : info.price}
+        </button>
+      </div>
+    );
+  };
 
   const Card = ({ item }) => {
     const has = owned.has(item.id);
@@ -105,6 +190,14 @@ export default function ShopPage() {
             style={{ filter: `drop-shadow(0 0 8px ${color})` }}
           >
             {item.emoji}
+          </div>
+        )}
+        {item.type === "bg" && (
+          <div
+            className="relative isolate h-12 border overflow-hidden"
+            style={{ borderColor: `${color}88` }}
+          >
+            <CardBackground id={item.id} glow="94,203,255" z="z-0" />
           </div>
         )}
         <div>
@@ -207,8 +300,29 @@ export default function ShopPage() {
             <div className="text-[10px] text-[#7fa8d6] tracking-wider text-center">
               КВЕСТ +5 · АНОМАЛИЯ +40 · БОСС НЕДЕЛИ +100
             </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] tracking-[0.2em] text-[#5f86b3]">
+                  ЛУТБОКСЫ
+                </div>
+                <Link
+                  href="/lootbox"
+                  className="text-[10px] tracking-widest text-amber-300 hover:text-white underline"
+                >
+                  ОТКРЫТЬ МОИ
+                </Link>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {BOX_TIERS.map((t) => (
+                  <BoxCard key={t} tier={t} />
+                ))}
+              </div>
+            </div>
+
             <Group title="ПИТОМЦЫ" items={pets} />
             <Group title="РАМКИ УДОСТОВЕРЕНИЯ" items={frames} />
+            <Group title="ФОНЫ УДОСТОВЕРЕНИЯ" items={bgs} />
             <Group title="ТИТУЛЫ" items={titles} />
             <div className="text-[9px] text-[#5f86b3] tracking-wider text-center">
               ЧАСТЬ ПРЕДМЕТОВ ОТКРЫВАЕТСЯ ДОСТИЖЕНИЯМИ, ЧАСТЬ ВЫПАДАЕТ ИЗ
@@ -221,6 +335,7 @@ export default function ShopPage() {
             )}
           </>
         )}
+
         <ItemPreview item={preview} onClose={() => setPreview(null)}>
           {preview &&
             (owned.has(preview.id) ? (
@@ -240,6 +355,25 @@ export default function ShopPage() {
               </button>
             ))}
         </ItemPreview>
+
+        <LootboxPreview
+          tier={boxPreview}
+          owned={owned}
+          onClose={() => setBoxPreview(null)}
+        >
+          {boxPreview && (
+            <button
+              onClick={async () => {
+                await buyBox(boxPreview);
+              }}
+              disabled={coins < BOX_INFO[boxPreview].price || !!busyId}
+              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold tracking-wider border border-amber-400/70 text-amber-200 py-2 hover:bg-amber-400 hover:text-slate-950 transition disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <Coins className="w-3.5 h-3.5" /> КУПИТЬ ЗА{" "}
+              {BOX_INFO[boxPreview].price}
+            </button>
+          )}
+        </LootboxPreview>
       </main>
     </div>
   );

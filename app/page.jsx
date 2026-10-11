@@ -28,6 +28,7 @@ import {
   Users,
   BellRing,
   Coins,
+  Gift,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -55,6 +56,7 @@ import {
   ANOMALY_XP,
   ANOMALY_BOSS_DAMAGE,
 } from "@/lib/quests";
+import { multipliersFromStats } from "@/lib/statEffects";
 const SOUNDS = {
   openModal: "/sounds/open.mp3",
   closeModal: "/sounds/close.mp3",
@@ -304,6 +306,9 @@ export default function HomePage() {
   const [dailyQuests, setDailyQuests] = useState([]);
   const [boss, setBoss] = useState(null);
   const [coins, setCoins] = useState(0);
+  const [stats, setStats] = useState({ str: 0, agi: 0, vit: 0, int: 0 });
+  const [boxes, setBoxes] = useState(0);
+  const [boxToast, setBoxToast] = useState(false);
   const [history, setHistory] = useState([]);
   const [unlockedAchievements, setUnlockedAchievements] = useState([]);
   const [newTaskText, setNewTaskText] = useState("");
@@ -450,7 +455,11 @@ export default function HomePage() {
         savedQuestsDate !== today && loadedDailyQuests.length > 0;
       const allDone = hadQuests && loadedDailyQuests.every((q) => q.completed);
       if (hadQuests && !allDone) {
-        xpFromSrc = Math.max(0, xpFromSrc - PENALTY_XP);
+        const pm = multipliersFromStats(src.stats);
+        xpFromSrc = Math.max(
+          0,
+          xpFromSrc - Math.round(PENALTY_XP * pm.penalty),
+        );
         streakFromSrc = 0;
       }
       loadedDailyQuests = generateDailyQuests(streakFromSrc);
@@ -466,7 +475,13 @@ export default function HomePage() {
         : freshBoss(weekStart);
 
     unlockedRef.current = achievements;
-    setCoins(Number(src.coins) || 0);
+    setStats({
+      str: Number(src.stats?.str) || 0,
+      agi: Number(src.stats?.agi) || 0,
+      vit: Number(src.stats?.vit) || 0,
+      int: Number(src.stats?.int) || 0,
+    });
+    setBoxes(Number(src.lootboxes) || 0);
     setLevel(Number(src.level) || 1);
     setXp(xpFromSrc);
     setStreak(streakFromSrc);
@@ -486,6 +501,7 @@ export default function HomePage() {
     clearTimeout(saveTimer.current);
     unlockedRef.current = [];
     setCoins(0);
+    setBoxes(0);
     setLevel(1);
     setXp(0);
     setStreak(0);
@@ -587,6 +603,12 @@ export default function HomePage() {
         setSyncState("saved");
         const saved = await safeJson(res).catch(() => null);
         if (saved && Number.isFinite(saved.coins)) setCoins(saved.coins);
+        if (saved && Number.isFinite(saved.lootboxes))
+          setBoxes(saved.lootboxes);
+        if (saved && saved.boxGain > 0) {
+          setBoxToast(true);
+          setTimeout(() => setBoxToast(false), 6000);
+        }
       } else {
         dirtyRef.current = true;
         setSyncState("error");
@@ -939,8 +961,14 @@ export default function HomePage() {
     if (!quest) return;
 
     const isAnomaly = quest.id === "anomaly";
-    const reward = isAnomaly ? ANOMALY_XP : xpPerTask;
-    const damage = isAnomaly ? ANOMALY_BOSS_DAMAGE : BOSS_DAMAGE_PER_QUEST;
+    const isStudy = CATEGORY_META[quest.category]?.icon === "BookOpen";
+    const sm = multipliersFromStats(stats);
+    const reward = Math.round(
+      (isAnomaly ? ANOMALY_XP : xpPerTask) * (isStudy ? sm.xp : 1),
+    );
+    const damage = Math.round(
+      (isAnomaly ? ANOMALY_BOSS_DAMAGE : BOSS_DAMAGE_PER_QUEST) * sm.boss,
+    );
 
     const isNowCompleted = !quest.completed;
     setDailyQuests((prev) =>
@@ -1192,6 +1220,14 @@ export default function HomePage() {
         onClose={() => setRecoveryOpen(false)}
         z="z-[110]"
       />
+      {boxToast && (
+        <Link
+          href="/lootbox"
+          className="fixed top-20 z-[95] border border-fuchsia-400/70 bg-fuchsia-950/80 text-fuchsia-100 px-4 py-2 text-xs tracking-[0.2em] uppercase shadow-[0_0_20px_rgba(217,70,239,0.5)] animate-pulse"
+        >
+          ПОЛУЧЕН ЛУТБОКС! ОТКРЫТЬ →
+        </Link>
+      )}
       <LevelUpFlash active={!!levelUpFlash} level={levelUpFlash} />
       <RankUpFlash active={!!rankUpFlash} rank={rankUpFlash} />
       {/* Уведомление о достижении */}
@@ -1593,6 +1629,16 @@ export default function HomePage() {
                       МАГАЗИН
                     </span>
                     <span className="text-[10px] opacity-90">◈ {coins}</span>
+                  </Link>
+                  <Link
+                    href="/lootbox"
+                    className="sys-title col-span-2 flex items-center justify-between border border-fuchsia-400/60 bg-fuchsia-400/10 hover:bg-fuchsia-400 hover:text-slate-950 text-fuchsia-200 py-2.5 px-4 text-xs tracking-[0.15em] uppercase transition"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Gift className="w-4 h-4" />
+                      ЛУТБОКСЫ
+                    </span>
+                    <span className="text-[10px] opacity-90">× {boxes}</span>
                   </Link>
                 </div>
 

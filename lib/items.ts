@@ -1,4 +1,4 @@
-export type ItemType = "frame" | "title" | "pet";
+export type ItemType = "frame" | "title" | "pet" | "bg";
 export type Rarity = "common" | "rare" | "epic" | "legendary";
 export type ItemSource = "default" | "achievement" | "shop" | "lootbox";
 
@@ -106,6 +106,17 @@ export const ITEMS: Item[] = [
   { id: "pet_trex", type: "pet", name: "ДРЕВНИЙ ЯЩЕР", rarity: "epic", source: "lootbox", emoji: "🦖" },
   { id: "pet_ghost", type: "pet", name: "ДУХ ПОДЗЕМЕЛЬЯ", rarity: "legendary", source: "lootbox", emoji: "👻" },
   { id: "pet_unicorn", type: "pet", name: "АСТРАЛЬНЫЙ ЕДИНОРОГ", rarity: "legendary", source: "lootbox", emoji: "🦄" },
+
+  // ================= ФОНЫ УДОСТОВЕРЕНИЯ =================
+  { id: "bg_grid", type: "bg", name: "НЕОНОВАЯ СЕТКА", rarity: "common", source: "shop", price: 100 },
+  { id: "bg_scan", type: "bg", name: "СКАН-ЛИНИИ", rarity: "common", source: "shop", price: 130 },
+  { id: "bg_storm", type: "bg", name: "ГРОЗА", rarity: "rare", source: "achievement", achievement: "streak_3" },
+  { id: "bg_stars", type: "bg", name: "ЗВЁЗДНАЯ ПЫЛЬ", rarity: "rare", source: "shop", price: 250 },
+  { id: "bg_matrix", type: "bg", name: "МАТРИЦА", rarity: "rare", source: "shop", price: 320 },
+  { id: "bg_aurora", type: "bg", name: "СЕВЕРНОЕ СИЯНИЕ", rarity: "epic", source: "shop", price: 650 },
+  { id: "bg_void", type: "bg", name: "ПУСТОТА", rarity: "epic", source: "lootbox" },
+  { id: "bg_gold", type: "bg", name: "ЗОЛОТАЯ ЛИХОРАДКА", rarity: "legendary", source: "shop", price: 1800 },
+  { id: "bg_shadow", type: "bg", name: "ИМПЕРИЯ ТЕНЕЙ", rarity: "legendary", source: "lootbox" },
 ];
 
 export const ITEM_BY_ID: Record<string, Item> = Object.fromEntries(
@@ -138,6 +149,8 @@ export function frameColors(frameId?: string) {
   if (!it || it.type !== "frame" || !it.color || !it.glow) return null;
   return { color: it.color, glow: it.glow };
 }
+
+// Настройки 3D-моделей питомцев (.glb в public/models/pets)
 export const PET_MODELS: Record<
   string,
   { scale?: number; y?: number; color?: string }
@@ -145,13 +158,13 @@ export const PET_MODELS: Record<
   pet_wolf: {},
   pet_rat: {},
   pet_cat: {},
-  pet_bat: { scale: 0.020 },
+  pet_bat: { scale: 0.02 },
   pet_owl: { scale: 0.45 },
   pet_snake: { scale: 0.015 },
   pet_fox: {},
   pet_spider: {},
-  pet_ant: { scale: 0.010, y: -0.4 },
-  pet_eagle: {y: 0.5},
+  pet_ant: { scale: 0.01, y: -0.4 },
+  pet_eagle: { y: 0.5 },
   pet_dragon: { scale: 0.045 },
   pet_pup: {},
 };
