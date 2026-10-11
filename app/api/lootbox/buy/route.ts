@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   if (!isTier(body?.tier)) {
     return NextResponse.json({ error: "НЕВЕРНЫЙ ЗАПРОС" }, { status: 400 });
   }
-  const tier = body.tier;
+  const tier = body.tier as keyof typeof BOX_INFO;
   const price = BOX_INFO[tier].price;
   const field = BOX_FIELD[tier];
 
