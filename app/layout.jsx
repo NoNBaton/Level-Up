@@ -1,6 +1,7 @@
 import "./globals.css";
 import RegisterSW from "./register-sw";
 import { ThemeProvider } from "./components/ThemeContext";
+
 export const metadata = {
   title: "LEVEL_UP // OS",
   description: "Cyberpunk Productivity System",
@@ -12,7 +13,8 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: "#020817",
+  themeColor: "#000000",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }) {

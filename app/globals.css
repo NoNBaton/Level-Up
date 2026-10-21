@@ -65,3 +65,9 @@
 .bg-\[\#5ecbff\]\/15 {
     background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important;
 }
+
+html,
+body {
+    background-color: #000;
+    overscroll-behavior-y: none;
+}
