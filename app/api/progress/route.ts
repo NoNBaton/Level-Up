@@ -101,6 +101,37 @@ export async function PUT(req: Request) {
     : [];
 
   const progress = { ...incomingProgress };
+
+  // ---------- Квесты-упражнения засчитываются только после проверки ----------
+  // (отжимания и приседания: камера, пробежка: GPS). Подтверждение пишет
+  // /api/exercise/verify в таблицу RewardClaim с ключом verified:ДАТА:ID_КВЕСТА
+  const EXERCISE_RE = /отжим|присед|пробе|push|squat|\brun/i;
+  const exerciseIds = new Set(
+    QUEST_DEFS.filter((d: any) => EXERCISE_RE.test(JSON.stringify(d))).map(
+      (d: any) => d.id,
+    ),
+  );
+  const qDate =
+    typeof progress.dailyQuestsDate === "string" ? progress.dailyQuestsDate : "";
+  const verifiedRows = qDate
+    ? await prisma.rewardClaim.findMany({
+        where: { playerId: id, key: { startsWith: `verified:${qDate}:` } },
+        select: { key: true },
+      })
+    : [];
+  const verifiedIds = new Set(verifiedRows.map((r) => r.key.split(":")[2]));
+  if (Array.isArray(progress.dailyQuests)) {
+    progress.dailyQuests = progress.dailyQuests.map((q: any) =>
+      q &&
+      q.completed === true &&
+      exerciseIds.has(q.id) &&
+      !verifiedIds.has(q.id)
+        ? { ...q, completed: false }
+        : q,
+    );
+  }
+  // ---------- конец блока ----------
+
   const prevTotal = Number.isFinite(prevProgress.completedTotal)
     ? prevProgress.completedTotal
     : 0;

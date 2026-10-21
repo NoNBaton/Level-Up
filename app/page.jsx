@@ -8,6 +8,7 @@ import RankUpFlash from "./components/RankUpFlash";
 import PushToggle from "./components/PushToggle";
 import { safeJson } from "@/lib/safeFetch";
 import ExerciseVerifier from "./components/ExerciseVerifier";
+import RunTracker from "./components/RunTracker";
 import {
   Plus,
   Trash2,
@@ -1002,16 +1003,26 @@ export default function HomePage() {
     }
   };
   const exerciseOf = (q) =>
-    /отжим/i.test(q.text) ? "pushup" : /присед/i.test(q.text) ? "squat" : null;
+    /отжим/i.test(q.text)
+      ? "pushup"
+      : /присед/i.test(q.text)
+        ? "squat"
+        : /пробе|(^|\s)бег/i.test(q.text)
+          ? "run"
+          : null;
 
   const handleQuestClick = (q) => {
     const ex = exerciseOf(q);
     if (ex && !q.completed) {
       playSound(SOUNDS.openModal);
+      const km = parseFloat(
+        (q.text.match(/(\d+(?:[.,]\d+)?)\s*км/i)?.[1] || "1").replace(",", "."),
+      );
       setVerifyQuest({
         quest: q,
         exercise: ex,
-        target: parseInt(q.text.match(/\d+/)?.[0], 10) || 10,
+        target:
+          ex === "run" ? km || 1 : parseInt(q.text.match(/\d+/)?.[0], 10) || 10,
       });
       return;
     }
@@ -1732,27 +1743,41 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-      {/* Окно проверки упражнения камерой */}
+      {/* Окно проверки выполнения */}
       <SystemWindow
         open={!!verifyQuest}
         tone="blue"
-        title="ПРОВЕРКА ВЫПОЛНЕНИЯ"
+        title={
+          verifyQuest?.exercise === "run" ? "ПРОБЕЖКА" : "ПРОВЕРКА ВЫПОЛНЕНИЯ"
+        }
         maxWidth="max-w-md"
         onClose={() => setVerifyQuest(null)}
       >
-        {verifyQuest && (
-          <ExerciseVerifier
-            exercise={verifyQuest.exercise}
-            target={verifyQuest.target}
-            questId={verifyQuest.quest.id}
-            date={getTodayString()}
-            onCancel={() => setVerifyQuest(null)}
-            onVerified={() => {
-              toggleDailyQuest(verifyQuest.quest.id);
-              setVerifyQuest(null);
-            }}
-          />
-        )}
+        {verifyQuest &&
+          (verifyQuest.exercise === "run" ? (
+            <RunTracker
+              target={verifyQuest.target}
+              questId={verifyQuest.quest.id}
+              date={getTodayString()}
+              onCancel={() => setVerifyQuest(null)}
+              onVerified={() => {
+                toggleDailyQuest(verifyQuest.quest.id);
+                setVerifyQuest(null);
+              }}
+            />
+          ) : (
+            <ExerciseVerifier
+              exercise={verifyQuest.exercise}
+              target={verifyQuest.target}
+              questId={verifyQuest.quest.id}
+              date={getTodayString()}
+              onCancel={() => setVerifyQuest(null)}
+              onVerified={() => {
+                toggleDailyQuest(verifyQuest.quest.id);
+                setVerifyQuest(null);
+              }}
+            />
+          ))}
       </SystemWindow>
       {/* Окно создания миссии */}
       <SystemWindow
