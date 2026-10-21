@@ -7,6 +7,7 @@ import LevelUpFlash from "./components/LevelUpFlash";
 import RankUpFlash from "./components/RankUpFlash";
 import PushToggle from "./components/PushToggle";
 import { safeJson } from "@/lib/safeFetch";
+import ExerciseVerifier from "./components/ExerciseVerifier";
 import {
   Plus,
   Trash2,
@@ -309,6 +310,7 @@ export default function HomePage() {
   const [stats, setStats] = useState({ str: 0, agi: 0, vit: 0, int: 0 });
   const [boxes, setBoxes] = useState(0);
   const [boxToast, setBoxToast] = useState(false);
+  const [verifyQuest, setVerifyQuest] = useState(null);
   const [history, setHistory] = useState([]);
   const [unlockedAchievements, setUnlockedAchievements] = useState([]);
   const [newTaskText, setNewTaskText] = useState("");
@@ -999,7 +1001,22 @@ export default function HomePage() {
       });
     }
   };
+  const exerciseOf = (q) =>
+    /отжим/i.test(q.text) ? "pushup" : /присед/i.test(q.text) ? "squat" : null;
 
+  const handleQuestClick = (q) => {
+    const ex = exerciseOf(q);
+    if (ex && !q.completed) {
+      playSound(SOUNDS.openModal);
+      setVerifyQuest({
+        quest: q,
+        exercise: ex,
+        target: parseInt(q.text.match(/\d+/)?.[0], 10) || 10,
+      });
+      return;
+    }
+    toggleDailyQuest(q.id);
+  };
   const handleFinishDay = () => {
     const uncompleted = tasks.filter((t) => !t.completed);
     if (uncompleted.length > 0) {
@@ -1410,31 +1427,6 @@ export default function HomePage() {
                   </div>
                 </section>
 
-                {/* Ежедневный прогресс */}
-                <section className="mb-5">
-                  <SysRow
-                    label="Ежедневный прогресс"
-                    value={`${dailyProgress}%`}
-                    done={dailyProgress === 100}
-                  />
-                  <div className="mt-2 h-2 border border-[#5ecbff]/40 bg-[#020817]/60 p-0.5">
-                    <div
-                      className="h-full transition-all duration-300"
-                      style={{
-                        width: `${dailyProgress}%`,
-                        background:
-                          dailyProgress === 100
-                            ? "linear-gradient(90deg, #34d399, #d1fae5)"
-                            : "linear-gradient(90deg, #5ecbff, #dff0ff)",
-                        boxShadow:
-                          dailyProgress === 100
-                            ? "0 0 10px #34d399"
-                            : "0 0 10px #5ecbff",
-                      }}
-                    />
-                  </div>
-                </section>
-
                 {/* Ежедневные авто-квесты */}
                 <section className="mb-5">
                   <SysSubtitle>ЕЖЕДНЕВНЫЕ КВЕСТЫ</SysSubtitle>
@@ -1458,11 +1450,11 @@ export default function HomePage() {
                           key={q.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => toggleDailyQuest(q.id)}
+                          onClick={() => handleQuestClick(q)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              toggleDailyQuest(q.id);
+                              handleQuestClick(q);
                             }
                           }}
                           className={`flex items-center gap-2.5 border px-2.5 py-2 cursor-pointer ${
@@ -1496,7 +1488,6 @@ export default function HomePage() {
                     })}
                   </div>
                 </section>
-
                 {/* Босс недели */}
                 {boss && (
                   <section className="mb-5">
@@ -1741,7 +1732,28 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
+      {/* Окно проверки упражнения камерой */}
+      <SystemWindow
+        open={!!verifyQuest}
+        tone="blue"
+        title="ПРОВЕРКА ВЫПОЛНЕНИЯ"
+        maxWidth="max-w-md"
+        onClose={() => setVerifyQuest(null)}
+      >
+        {verifyQuest && (
+          <ExerciseVerifier
+            exercise={verifyQuest.exercise}
+            target={verifyQuest.target}
+            questId={verifyQuest.quest.id}
+            date={getTodayString()}
+            onCancel={() => setVerifyQuest(null)}
+            onVerified={() => {
+              toggleDailyQuest(verifyQuest.quest.id);
+              setVerifyQuest(null);
+            }}
+          />
+        )}
+      </SystemWindow>
       {/* Окно создания миссии */}
       <SystemWindow
         open={isModalOpen}
