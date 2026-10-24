@@ -9,6 +9,7 @@ import PushToggle from "./components/PushToggle";
 import { safeJson } from "@/lib/safeFetch";
 import ExerciseVerifier from "./components/ExerciseVerifier";
 import RunTracker from "./components/RunTracker";
+import DungeonGate from "./components/DungeonGate";
 import {
   Plus,
   Trash2,
@@ -57,6 +58,7 @@ import {
   CATEGORY_META,
   ANOMALY_XP,
   ANOMALY_BOSS_DAMAGE,
+  QUESTS_VERSION,
 } from "@/lib/quests";
 import { multipliersFromStats } from "@/lib/statEffects";
 const SOUNDS = {
@@ -298,6 +300,7 @@ export default function HomePage() {
   const [authQuestion, setAuthQuestion] = useState(RECOVERY_QUESTIONS[0]);
   const [authAnswer, setAuthAnswer] = useState("");
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [gateSeen, setGateSeen] = useState(true);
   // Игровое состояние
   const [level, setLevel] = useState(1);
   const [xp, setXp] = useState(0);
@@ -453,7 +456,11 @@ export default function HomePage() {
     let xpFromSrc = Number(src.xp) || 0;
     let streakFromSrc = streakAlive ? Number(src.streak) || 0 : 0;
 
-    if (savedQuestsDate !== today || loadedDailyQuests.length === 0) {
+    if (
+      savedQuestsDate !== today ||
+      loadedDailyQuests.length === 0 ||
+      prog.dailyQuestsVer !== QUESTS_VERSION
+    ) {
       const hadQuests =
         savedQuestsDate !== today && loadedDailyQuests.length > 0;
       const allDone = hadQuests && loadedDailyQuests.every((q) => q.completed);
@@ -477,6 +484,7 @@ export default function HomePage() {
         ? savedBoss
         : freshBoss(weekStart);
 
+    setGateSeen(player.gateSeen !== false);
     unlockedRef.current = achievements;
     setStats({
       str: Number(src.stats?.str) || 0,
@@ -515,6 +523,7 @@ export default function HomePage() {
     setBoss(null);
     setHistory(generate7DaysHistory([], []));
     setUnlockedAchievements([]);
+    setGateSeen(true);
     setSyncState("idle");
   };
 
@@ -578,6 +587,7 @@ export default function HomePage() {
       tasks,
       dailyQuests,
       dailyQuestsDate: getTodayString(),
+      dailyQuestsVer: QUESTS_VERSION,
       boss,
       history: history.map(({ date, completed, total, tasksSnapshot }) => ({
         date,
@@ -1022,7 +1032,10 @@ export default function HomePage() {
         quest: q,
         exercise: ex,
         target:
-          ex === "run" ? km || 1 : parseInt(q.text.match(/\d+/)?.[0], 10) || 10,
+          q.target ||
+          (ex === "run"
+            ? km || 1
+            : parseInt(q.text.match(/\d+/)?.[0], 10) || 10),
       });
       return;
     }
@@ -1060,6 +1073,30 @@ export default function HomePage() {
           } catch {
             // ignore
           }
+        }}
+      />
+    );
+  }
+
+  // Врата подземелья: показываются один раз новому игроку
+  if (profile && !gateSeen) {
+    return (
+      <DungeonGate
+        onEnter={async () => {
+          try {
+            await fetch("/api/gate", { method: "POST" });
+          } catch {
+            // ignore
+          }
+          setGateSeen(true);
+        }}
+        onDecline={async () => {
+          try {
+            window.close();
+          } catch {
+            // ignore
+          }
+          await handleLogout();
         }}
       />
     );
@@ -1240,7 +1277,7 @@ export default function HomePage() {
             >
               ЗАБЫЛИ КОД ДОСТУПА?
             </button>
-          )}{" "}
+          )}
         </form>
       </SystemWindow>
       <RecoveryModal
@@ -1441,6 +1478,9 @@ export default function HomePage() {
                 {/* Ежедневные авто-квесты */}
                 <section className="mb-5">
                   <SysSubtitle>ЕЖЕДНЕВНЫЕ КВЕСТЫ</SysSubtitle>
+                  <div className="mt-2 text-center text-[11px] text-[#9fd0ff] tracking-wider">
+                    [Ежедневный квест: Тренировка силы]
+                  </div>
                   {dailyQuests.some((q) => q.id === "anomaly") && (
                     <div className="mt-3 border border-fuchsia-400/60 bg-fuchsia-400/10 p-2 text-center text-[11px] font-bold tracking-[0.2em] text-fuchsia-200 animate-pulse">
                       ⚠ АНОМАЛИЯ ОБНАРУЖЕНА · НАГРАДА +{ANOMALY_XP} XP
@@ -1490,13 +1530,22 @@ export default function HomePage() {
                           >
                             <SysRow
                               label={q.text}
-                              value={q.completed ? "1/1" : "0/1"}
+                              value={
+                                q.target
+                                  ? `${q.completed ? q.target : 0}/${q.target}${q.unit || ""}`
+                                  : q.completed
+                                    ? "1/1"
+                                    : "0/1"
+                              }
                               done={q.completed}
                             />
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                  <div className="mt-3 text-center text-[10px] tracking-wider text-rose-400">
+                    ПРЕДУПРЕЖДЕНИЕ: за невыполнение — штраф
                   </div>
                 </section>
                 {/* Босс недели */}

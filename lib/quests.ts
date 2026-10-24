@@ -2,6 +2,9 @@ export const PENALTY_XP = 15;
 export const BOSS_MAX_HP = 700;
 export const BOSS_DAMAGE_PER_QUEST = 35;
 
+// Версия набора ежедневных квестов. При смене старые квесты пересоздаются.
+export const QUESTS_VERSION = 2;
+
 // Аномалия: особый квест с повышенной наградой
 export const ANOMALY_XP = 150;
 export const ANOMALY_BOSS_DAMAGE = BOSS_DAMAGE_PER_QUEST * 3;
@@ -19,42 +22,45 @@ type QuestDef = {
   step: number;
   cap: number;
   isFloat?: boolean;
+  unit?: string;
   text: (n: number) => string;
 };
 
+// Ежедневная тренировка как в Solo Leveling: цели всегда одинаковые
 export const QUEST_DEFS: QuestDef[] = [
   {
-    id: "sport_pushups",
+    id: "d-pushups",
     category: "sport",
-    base: 10,
-    step: 10,
-    cap: 500,
-    text: (n: number) => `Сделай ${n} отжиманий`,
+    base: 100,
+    step: 0,
+    cap: 100,
+    text: () => "Отжимания",
   },
   {
-    id: "sport_squats",
+    id: "d-situps",
     category: "sport",
-    base: 10,
-    step: 10,
-    cap: 500,
-    text: (n: number) => `Сделай ${n} приседаний`,
+    base: 100,
+    step: 0,
+    cap: 100,
+    text: () => "Пресс",
   },
   {
-    id: "sport_run",
+    id: "d-squats",
     category: "sport",
-    base: 1,
-    step: 0.2,
-    cap: 20,
+    base: 100,
+    step: 0,
+    cap: 100,
+    text: () => "Приседания",
+  },
+  {
+    id: "d-run",
+    category: "sport",
+    base: 10,
+    step: 0,
+    cap: 10,
     isFloat: true,
-    text: (n: number) => `Пробеги ${n} км`,
-  },
-  {
-    id: "study_read",
-    category: "study",
-    base: 5,
-    step: 1,
-    cap: 40,
-    text: (n: number) => `Прочитай ${n} страниц`,
+    unit: "км",
+    text: () => "Бег",
   },
 ];
 
@@ -85,24 +91,18 @@ function rawAnomaly(dateStr: string) {
 }
 
 // Аномалия примерно раз в 5 дней, но никогда два дня подряд
-export function isAnomalyDay (dateStr: string) {
+export function isAnomalyDay(dateStr: string) {
   const [y, m, d] = dateStr.split("-").map(Number);
   const prev = localDateStr(new Date(y, m - 1, d - 1));
   return rawAnomaly(dateStr) && !rawAnomaly(prev);
 }
 
-function amt(id: string, streak: number, mult: number) {
-  const def = QUEST_DEFS.find((q) => q.id === id)!;
-  const v = questAmount(def, streak) * mult;
-  return def.isFloat ? Math.round(v * 10) / 10 : Math.round(v);
-}
-
-const ANOMALY_TASKS: ((s: number) => string)[] = [
-  (s) =>
-    `Сделай ${amt("sport_pushups", s, 2)} отжиманий и ${amt("sport_squats", s, 2)} приседаний`,
-  (s) => `Пробеги ${amt("sport_run", s, 2)} км`,
-  (s) =>
-    `Прочитай ${amt("study_read", s, 3)} страниц и сделай ${amt("sport_pushups", s, 1)} отжиманий`,
+// Аномальные задания: одно большое испытание вместо обычных квестов.
+// В тексте только одно число, чтобы проверка брала правильную цель.
+const ANOMALY_TASKS: string[] = [
+  "Сделай 200 приседаний",
+  "Пробеги 15 км",
+  "Сделай 200 отжиманий",
 ];
 
 export function generateDailyQuests(
@@ -115,17 +115,22 @@ export function generateDailyQuests(
       {
         id: "anomaly",
         category: "anomaly",
-        text: ANOMALY_TASKS[pick](streak),
+        text: ANOMALY_TASKS[pick],
         completed: false,
       },
     ];
   }
-  return QUEST_DEFS.map((def) => ({
-    id: def.id,
-    category: def.category,
-    text: def.text(questAmount(def, streak)),
-    completed: false,
-  }));
+  return QUEST_DEFS.map((def) => {
+    const target = questAmount(def, streak);
+    return {
+      id: def.id,
+      category: def.category,
+      text: def.text(target),
+      target,
+      unit: def.unit ?? "",
+      completed: false,
+    };
+  });
 }
 
 export function getWeekMonday(d: Date = new Date()) {

@@ -141,5 +141,6 @@ export function privatePlayer(p: PlayerRow) {
     coins: p.coins ?? 0,
     lootboxes: p.lootboxes ?? 0,
     statPoints: availableStatPoints(p),
+    gateSeen: p.gateSeen,
   };
 }

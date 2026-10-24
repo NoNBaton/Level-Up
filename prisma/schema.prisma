@@ -28,9 +28,11 @@ model Player {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @default(now()) @updatedAt
 
+  gateSeen            Boolean   @default(false)
+
   coins               Int       @default(0)
   lootboxes           Int       @default(0)
-    lootboxesRare       Int       @default(0)
+  lootboxesRare       Int       @default(0)
   lootboxesLegendary  Int       @default(0)
   statStr             Int       @default(0)
   statAgi             Int       @default(0)
@@ -39,7 +41,7 @@ model Player {
   title               String    @default("")
   frame               String    @default("frame_rank")
   pet                 String    @default("")
-    bg                  String    @default("")
+  bg                  String    @default("")
   inventory           InventoryItem[]
 
   sentRequests      Friendship[] @relation("FriendRequester")
