@@ -104,6 +104,7 @@ type PlayerRow = {
   createdAt: Date;
   coins?: number;
   lootboxes?: number;
+  gateSeen?: boolean;   // <-- добавить
   statStr?: number;
   statAgi?: number;
   statVit?: number;
