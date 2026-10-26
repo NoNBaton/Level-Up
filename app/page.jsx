@@ -10,6 +10,8 @@ import { safeJson } from "@/lib/safeFetch";
 import ExerciseVerifier from "./components/ExerciseVerifier";
 import RunTracker from "./components/RunTracker";
 import DungeonGate from "./components/DungeonGate";
+import DailyTimer from "./components/DailyTimer";
+import BossCard from "./components/BossCard";
 import {
   Plus,
   Trash2,
@@ -968,7 +970,11 @@ export default function HomePage() {
       setCompletedTotal((c) => Math.max(0, c - 1));
     }
   };
-
+  const setQuestProgress = (id, value) => {
+    setDailyQuests((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, progress: value } : q)),
+    );
+  };
   const toggleDailyQuest = (id) => {
     const quest = dailyQuests.find((q) => q.id === id);
     if (!quest) return;
@@ -1031,6 +1037,7 @@ export default function HomePage() {
       setVerifyQuest({
         quest: q,
         exercise: ex,
+        done: q.progress || 0,
         target:
           q.target ||
           (ex === "run"
@@ -1481,6 +1488,12 @@ export default function HomePage() {
                   <div className="mt-2 text-center text-[11px] text-[#9fd0ff] tracking-wider">
                     [Ежедневный квест: Тренировка силы]
                   </div>
+                  <DailyTimer
+                    done={
+                      dailyQuests.length > 0 &&
+                      dailyQuests.every((q) => q.completed)
+                    }
+                  />
                   {dailyQuests.some((q) => q.id === "anomaly") && (
                     <div className="mt-3 border border-fuchsia-400/60 bg-fuchsia-400/10 p-2 text-center text-[11px] font-bold tracking-[0.2em] text-fuchsia-200 animate-pulse">
                       ⚠ АНОМАЛИЯ ОБНАРУЖЕНА · НАГРАДА +{ANOMALY_XP} XP
@@ -1532,7 +1545,7 @@ export default function HomePage() {
                               label={q.text}
                               value={
                                 q.target
-                                  ? `${q.completed ? q.target : 0}/${q.target}${q.unit || ""}`
+                                  ? `${q.completed ? q.target : q.progress || 0}/${q.target}${q.unit || ""}`
                                   : q.completed
                                     ? "1/1"
                                     : "0/1"
@@ -1549,42 +1562,7 @@ export default function HomePage() {
                   </div>
                 </section>
                 {/* Босс недели */}
-                {boss && (
-                  <section className="mb-5">
-                    <SysSubtitle tone={boss.defeated ? "green" : "red"}>
-                      БОСС НЕДЕЛИ
-                    </SysSubtitle>
-                    <div className="mt-3 flex items-center gap-3">
-                      <Skull
-                        className={`w-8 h-8 shrink-0 ${boss.defeated ? "text-emerald-300" : "text-rose-300"}`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[10px] tracking-[0.15em] text-[#e6f1ff] uppercase truncate">
-                          {boss.defeated
-                            ? `${boss.theme} — ПОВЕРЖЕН`
-                            : boss.theme}
-                        </div>
-                        <div className="mt-1.5 h-2.5 border border-rose-400/40 bg-[#020817]/60 p-0.5">
-                          <div
-                            className="h-full transition-all duration-500"
-                            style={{
-                              width: `${(boss.hp / boss.maxHp) * 100}%`,
-                              background: boss.defeated
-                                ? "linear-gradient(90deg, #34d399, #d1fae5)"
-                                : "linear-gradient(90deg, #ff4d6d, #ffb4c2)",
-                              boxShadow: boss.defeated
-                                ? "0 0 10px #34d399"
-                                : "0 0 10px #ff4d6d",
-                            }}
-                          />
-                        </div>
-                        <div className="mt-1 text-[9px] text-[#8fb6e6] text-right">
-                          {boss.hp}/{boss.maxHp} HP
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                )}
+                {boss && <BossCard boss={boss} />}
 
                 {/* История активности */}
                 <section className="mb-5">
@@ -1818,8 +1796,10 @@ export default function HomePage() {
             <ExerciseVerifier
               exercise={verifyQuest.exercise}
               target={verifyQuest.target}
+              done={verifyQuest.done}
               questId={verifyQuest.quest.id}
               date={getTodayString()}
+              onProgress={(n) => setQuestProgress(verifyQuest.quest.id, n)}
               onCancel={() => setVerifyQuest(null)}
               onVerified={() => {
                 toggleDailyQuest(verifyQuest.quest.id);

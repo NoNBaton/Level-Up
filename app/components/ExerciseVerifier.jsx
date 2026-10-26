@@ -6,7 +6,6 @@ const WASM =
 const MODEL =
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
-// Точки MediaPipe Pose: [плечо, локоть, запястье, бедро, колено, лодыжка]
 const SIDES = {
   left: { sh: 11, el: 13, wr: 15, hip: 23, kn: 25, an: 27 },
   right: { sh: 12, el: 14, wr: 16, hip: 24, kn: 26, an: 28 },
@@ -14,19 +13,20 @@ const SIDES = {
 const CFG = {
   pushup: {
     title: "ОТЖИМАНИЯ",
-    minRep: 700,
+    minRep: 600,
     tip: "Поставь телефон сбоку на полу, 1,5–2 м от тебя, чтобы было видно всё тело. Прими упор лёжа.",
   },
   squat: {
     title: "ПРИСЕДАНИЯ",
-    minRep: 900,
+    minRep: 800,
     tip: "Поставь телефон сбоку, 2–2,5 м от тебя, чтобы было видно всё тело от головы до ног. Встань прямо.",
   },
 };
 
-const angle = (a, b, c) => {
-  const v1 = { x: a.x - b.x, y: a.y - b.y },
-    v2 = { x: c.x - b.x, y: c.y - b.y };
+// Угол с поправкой на пропорции кадра (иначе углы искажаются)
+const angle = (a, b, c, ar) => {
+  const v1 = { x: (a.x - b.x) * ar, y: a.y - b.y },
+    v2 = { x: (c.x - b.x) * ar, y: c.y - b.y };
   const m = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y);
   if (!m) return 180;
   return (
@@ -37,28 +37,32 @@ const angle = (a, b, c) => {
 };
 
 /**
- * exercise: "pushup" | "squat"
- * target: сколько повторов
- * questId, date: что именно подтверждаем (уйдёт на сервер)
- * onVerified: вызывается, когда сервер подтвердил
+ * target: общая цель квеста (например 100)
+ * done: сколько уже сделано раньше (из сохранённого прогресса)
+ * onProgress(n): вызывается после каждого повтора с общим числом
  */
-export default function ExerciseVerifier({
+export default function ({
   exercise = "pushup",
   target = 10,
+  done = 0,
   questId,
   date,
   verifyUrl = "/api/exercise/verify",
+  onProgress,
   onVerified,
   onCancel,
 }) {
   const cfg = CFG[exercise] || CFG.pushup;
+  const base = Math.min(done, target - 1); // уже сделанные повторы
+  const remaining = target - base; // сколько осталось сделать сейчас
   const videoRef = useRef(null),
     canvasRef = useRef(null);
   const run = useRef({ stop: () => {} });
   const alive = useRef(true);
-  const [phase, setPhase] = useState("idle"); // idle | loading | active | sending | done | error
-  const [reps, setReps] = useState(0);
+  const [phase, setPhase] = useState("idle");
+  const [reps, setReps] = useState(base);
   const [hint, setHint] = useState("");
+  const [dbg, setDbg] = useState("");
   const [facing, setFacing] = useState("user");
 
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function ExerciseVerifier({
 
   async function start() {
     setPhase("loading");
-    setReps(0);
+    setReps(base);
     setHint("");
     try {
       const r0 = await fetch(verifyUrl, {
@@ -80,7 +84,7 @@ export default function ExerciseVerifier({
         body: JSON.stringify({
           action: "start",
           exercise,
-          target,
+          target: remaining,
           questId,
           date,
         }),
@@ -134,6 +138,7 @@ export default function ExerciseVerifier({
         last: -1,
         raf: 0,
         dead: false,
+        ar: canvas.width / canvas.height,
       };
       run.current.stop = () => {
         st.dead = true;
@@ -162,7 +167,7 @@ export default function ExerciseVerifier({
             st.phase = null;
             setHint("Тебя не видно, отойди чуть дальше");
           }
-          if (st.reps >= target) {
+          if (st.reps >= remaining) {
             finish(st, token);
             return;
           }
@@ -187,7 +192,8 @@ export default function ExerciseVerifier({
     st.reps++;
     st.lastRep = now;
     st.times.push(Math.round(now - st.t0));
-    setReps(st.reps);
+    setReps(base + st.reps);
+    onProgress?.(base + st.reps); // прогресс сохраняется после каждого повтора
     setHint("Засчитано ✔");
   };
 
@@ -206,7 +212,7 @@ export default function ExerciseVerifier({
 
   function analysePushup(lm, now, st) {
     const { v, p } = pick(lm);
-    if (v < 0.5) {
+    if (v < 0.4) {
       st.phase = null;
       setHint("Встань боком, чтобы было видно всё тело");
       return;
@@ -214,22 +220,26 @@ export default function ExerciseVerifier({
     const { sh, el, wr, hip, an } = p;
     const dx = Math.abs(sh.x - an.x),
       dy = Math.abs(sh.y - an.y);
-    if (!(dx > 0.3 && dy / dx < 0.6) || wr.y < sh.y - 0.02) {
+    if (!(dx > 0.25 && dy / dx < 0.8)) {
       st.phase = null;
+      setDbg("поза: нет упора лёжа");
       setHint("Прими упор лёжа боком к камере");
       return;
     }
-    const elbow = angle(sh, el, wr),
-      body = angle(sh, hip, an),
-      len = Math.hypot(sh.x - an.x, sh.y - an.y);
+    const elbow = angle(sh, el, wr, st.ar),
+      body = angle(sh, hip, an, st.ar),
+      len = Math.hypot((sh.x - an.x) * st.ar, sh.y - an.y);
+    setDbg(
+      `локоть ${Math.round(elbow)}° · корпус ${Math.round(body)}° · ${st.phase || "ждём"}`,
+    );
 
-    if (st.phase === null && elbow >= 150) {
+    if (st.phase === null && elbow >= 145) {
       st.phase = "up";
       st.upY = sh.y;
     }
     if (st.phase === "up") {
-      if (elbow >= 150) st.upY = Math.min(st.upY, sh.y);
-      if (elbow <= 100) {
+      if (elbow >= 145) st.upY = Math.min(st.upY, sh.y);
+      if (elbow <= 110) {
         st.phase = "down";
         st.downY = sh.y;
         st.minBody = body;
@@ -238,10 +248,10 @@ export default function ExerciseVerifier({
     } else if (st.phase === "down") {
       st.downY = Math.max(st.downY, sh.y);
       st.minBody = Math.min(st.minBody, body);
-      if (elbow >= 150) {
-        if (st.minBody < 145)
+      if (elbow >= 145) {
+        if (st.minBody < 135)
           setHint("Не считаю: держи корпус прямым, таз не провисает");
-        else if (st.downY - st.upY < 0.05 * len)
+        else if (st.downY - st.upY < 0.04 * len)
           setHint("Не считаю: опустись ниже");
         else if (now - st.lastRep < cfg.minRep)
           setHint("Не считаю: слишком быстро");
@@ -254,18 +264,19 @@ export default function ExerciseVerifier({
 
   function analyseSquat(lm, now, st) {
     const { v, p } = pick(lm);
-    if (v < 0.5) {
+    if (v < 0.4) {
       st.phase = null;
       setHint("Встань боком, чтобы было видно всё тело");
       return;
     }
     const { sh, hip, kn, an } = p;
-    const knee = angle(hip, kn, an);
+    const knee = angle(hip, kn, an, st.ar);
     const dx = Math.abs(sh.x - an.x),
       dy = Math.abs(sh.y - an.y);
+    setDbg(`колено ${Math.round(knee)}° · ${st.phase || "ждём"}`);
 
     if (st.phase === null) {
-      if (knee >= 160 && dy > 0.35 && dx < 0.5 * dy) {
+      if (knee >= 155 && dy > 0.3) {
         st.phase = "up";
         st.upY = hip.y;
         st.h = dy;
@@ -273,19 +284,19 @@ export default function ExerciseVerifier({
       return;
     }
     if (st.phase === "up") {
-      if (knee >= 160) {
+      if (knee >= 155) {
         st.upY = Math.min(st.upY, hip.y);
         st.h = Math.max(st.h * 0.9, dy);
       }
-      if (knee <= 100) {
+      if (knee <= 110) {
         st.phase = "down";
         st.downY = hip.y;
         setHint("Вверх!");
-      } else if (knee < 160) setHint("Приседай глубже");
+      } else if (knee < 155) setHint("Приседай глубже");
     } else if (st.phase === "down") {
       st.downY = Math.max(st.downY, hip.y);
-      if (knee >= 160) {
-        if (st.downY - st.upY < 0.12 * st.h) setHint("Не считаю: присядь ниже");
+      if (knee >= 155) {
+        if (st.downY - st.upY < 0.1 * st.h) setHint("Не считаю: присядь ниже");
         else if (now - st.lastRep < cfg.minRep)
           setHint("Не считаю: слишком быстро");
         else count(st, now);
@@ -342,7 +353,7 @@ export default function ExerciseVerifier({
       if (!alive.current) return;
       setPhase("done");
       setHint("ВЫПОЛНЕНО!");
-      onVerified?.({ reps: st.reps });
+      onVerified?.({ reps: target });
     } catch (e) {
       if (alive.current) {
         setPhase("error");
@@ -403,14 +414,22 @@ export default function ExerciseVerifier({
       >
         {hint}
       </p>
+      {phase === "active" && (
+        <p style={{ fontSize: 10, color: "#5f86b3", letterSpacing: 1 }}>
+          {dbg}
+        </p>
+      )}
       {(phase === "idle" || phase === "error") && (
         <>
           {phase === "idle" && (
-            <p style={{ fontSize: 12, color: "#8fb6e6" }}>{cfg.tip}</p>
+            <p style={{ fontSize: 12, color: "#8fb6e6" }}>
+              {base > 0 ? `Продолжаем с ${base}. ` : ""}
+              {cfg.tip}
+            </p>
           )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button style={btn} onClick={start}>
-              [ НАЧАТЬ ]
+              {base > 0 ? "[ ПРОДОЛЖИТЬ ]" : "[ НАЧАТЬ ]"}
             </button>
             <button
               style={{ ...btn, opacity: 0.8 }}
@@ -422,7 +441,7 @@ export default function ExerciseVerifier({
             </button>
             {onCancel && (
               <button style={{ ...btn, opacity: 0.8 }} onClick={onCancel}>
-                ОТМЕНА
+                ЗАКРЫТЬ
               </button>
             )}
           </div>

@@ -1,10 +1,17 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { ArrowLeft, Gift, Coins, Eye } from "lucide-react";
 import { RARITY_COLOR } from "@/lib/items";
+import {
+  ChargeBox,
+  RevealFx,
+  RarityBanner,
+  Shine,
+  vibrateFor,
+} from "../components/LootboxFx";
 import {
   BOX_INFO,
   BOX_TIERS,
@@ -38,13 +45,8 @@ const REEL_LEN = 56;
 const SPIN_SECONDS = 6.5;
 
 // Параметры открытия
-const SHAKE_MS = 300; // тряска
-const BURST_MS = 300; // распад на пиксели
-
-// Сетка пикселей
-const GRID = 10;
-const BOX = 160; // размер коробки в px (w-40 h-40)
-const CELL = BOX / GRID;
+const SHAKE_MS = 1600; // зарядка
+const BURST_MS = 900; // взрыв
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -122,134 +124,6 @@ function ReelTile({ item }) {
         style={{ background: c }}
       />
     </div>
-  );
-}
-
-// Коробка, рассыпающаяся на пиксели
-function PixelBurst({ color }) {
-  const cells = useMemo(() => {
-    const list = [];
-    for (let r = 0; r < GRID; r++) {
-      for (let c = 0; c < GRID; c++) {
-        const edge = r === 0 || c === 0 || r === GRID - 1 || c === GRID - 1;
-        const core = r >= 3 && r <= 6 && c >= 3 && c <= 6;
-        let bg;
-        let op;
-        if (edge) {
-          bg = color;
-          op = 1;
-        } else if (core) {
-          bg = color;
-          op = 0.55 + Math.random() * 0.45;
-        } else {
-          bg = Math.random() > 0.5 ? color : "#0b1730";
-          op = 0.25 + Math.random() * 0.4;
-        }
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 90 + Math.random() * 190;
-        list.push({
-          key: `${r}_${c}`,
-          x: c * CELL,
-          y: r * CELL,
-          bg,
-          op,
-          dx: Math.cos(angle) * dist,
-          dy: Math.sin(angle) * dist - 40,
-          rot: (Math.random() - 0.5) * 360,
-          // волна слева направо + случайный разброс
-          delay: (c / GRID) * 0.45 + Math.random() * 0.25,
-          dur: 0.6 + Math.random() * 0.45,
-        });
-      }
-    }
-    return list;
-  }, [color]);
-
-  return (
-    <div className="relative" style={{ width: BOX, height: BOX }}>
-      {cells.map((p) => (
-        <motion.div
-          key={p.key}
-          aria-hidden
-          className="absolute"
-          style={{
-            left: p.x,
-            top: p.y,
-            width: CELL,
-            height: CELL,
-            background: p.bg,
-            boxShadow: `0 0 6px ${color}`,
-          }}
-          initial={{ x: 0, y: 0, opacity: p.op, scale: 1, rotate: 0 }}
-          animate={{
-            x: p.dx,
-            y: p.dy,
-            opacity: 0,
-            scale: 0.2,
-            rotate: p.rot,
-          }}
-          transition={{ duration: p.dur, delay: p.delay, ease: "easeOut" }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// Коробка: покой, тряска, распад
-function PixelBox({ phase, info, count }) {
-  const shaking = phase === "shake";
-  const bursting = phase === "burst";
-
-  let animate = { opacity: 1, scale: 1, y: [0, -8, 0] };
-  let transition = { duration: 2.6, repeat: Infinity, ease: "easeInOut" };
-  if (shaking) {
-    animate = {
-      opacity: 1,
-      rotate: [0, -4, 4, -7, 7, -10, 10, -12, 12, 0],
-      scale: [1, 1.02, 1.04, 1.06, 1.08, 1.1],
-      y: 0,
-    };
-    transition = { duration: SHAKE_MS / 1000, ease: "easeIn" };
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.1 } }}
-      className="relative flex items-center justify-center"
-      style={{ width: BOX, height: BOX }}
-    >
-      {bursting ? (
-        <PixelBurst color={info.color} />
-      ) : (
-        <motion.div
-          animate={animate}
-          transition={transition}
-          className="w-40 h-40 border-2 flex items-center justify-center relative"
-          style={{
-            borderColor: info.color,
-            background: `radial-gradient(circle at 50% 40%, ${info.color}4d, rgba(2,8,23,0.9) 70%)`,
-            boxShadow: shaking
-              ? `0 0 50px ${info.color}, inset 0 0 40px ${info.color}66`
-              : `0 0 30px ${info.color}88, inset 0 0 30px ${info.color}33`,
-            transition: "box-shadow 0.8s",
-          }}
-        >
-          <Gift className="w-20 h-20" style={{ color: info.color }} />
-          <div
-            className="absolute -bottom-7 text-[10px] tracking-[0.3em] whitespace-nowrap"
-            style={{ color: info.color }}
-          >
-            {shaking
-              ? "ВСКРЫТИЕ..."
-              : count > 0
-                ? `В НАЛИЧИИ: ${count}`
-                : "ПУСТО"}
-          </div>
-        </motion.div>
-      )}
-    </motion.div>
   );
 }
 
@@ -403,6 +277,7 @@ export default function LootboxPage() {
     if (r) {
       setBoxes(r.boxes);
       setCoins(r.coins);
+      vibrateFor(r.item?.rarity);
     }
     setPhase("reveal");
   };
@@ -422,7 +297,7 @@ export default function LootboxPage() {
     setReel(null);
     doneRef.current = false;
 
-    // 1. тряска (в это время сервер делает розыгрыш)
+    // 1. зарядка (в это время сервер делает розыгрыш)
     setPhase("shake");
     try {
       const [res] = await Promise.all([
@@ -442,7 +317,7 @@ export default function LootboxPage() {
       resultRef.current = data;
       setResult(data);
 
-      // 2. распад на пиксели
+      // 2. взрыв
       setPhase("burst");
       await wait(BURST_MS);
 
@@ -552,14 +427,16 @@ export default function LootboxPage() {
               })}
             </div>
 
-            <div className="relative h-72 flex items-center justify-center">
+            <div className="relative min-h-[22rem] flex items-center justify-center">
               <AnimatePresence mode="wait">
                 {boxVisible && (
-                  <PixelBox
+                  <ChargeBox
                     key={`box_${tier}`}
                     phase={phase}
                     info={info}
                     count={count}
+                    color={color}
+                    chargeMs={SHAKE_MS}
                   />
                 )}
 
@@ -587,30 +464,37 @@ export default function LootboxPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                   >
-                    <motion.div
-                      aria-hidden
-                      className="absolute w-48 h-48 rounded-full pointer-events-none"
-                      style={{
-                        background: `radial-gradient(circle, ${color}, transparent 65%)`,
-                      }}
-                      initial={{ opacity: 0.9, scale: 0.3 }}
-                      animate={{ opacity: 0, scale: 3 }}
-                      transition={{ duration: 1.1, ease: "easeOut" }}
-                    />
+                    <RevealFx rarity={item.rarity} color={color} />
+                    <RarityBanner rarity={item.rarity} color={color} />
                     <motion.div
                       initial={{ scale: 0.2, rotate: -20, opacity: 0 }}
-                      animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                      animate={{
+                        scale: 1,
+                        rotate: 0,
+                        opacity: 1,
+                        boxShadow:
+                          item.rarity === "legendary" || item.rarity === "epic"
+                            ? [
+                                `0 0 20px ${color}88`,
+                                `0 0 55px ${color}`,
+                                `0 0 20px ${color}88`,
+                              ]
+                            : `0 0 28px ${color}aa`,
+                      }}
                       transition={{
                         type: "spring",
                         stiffness: 260,
                         damping: 16,
+                        boxShadow: {
+                          type: "tween",
+                          duration: 1.4,
+                          repeat: Infinity,
+                        },
                       }}
-                      className="relative w-44 border-2 p-4 text-center bg-[#020817]"
-                      style={{
-                        borderColor: color,
-                        boxShadow: `0 0 28px ${color}aa`,
-                      }}
+                      className="relative w-44 border-2 p-4 text-center bg-[#020817] overflow-hidden"
+                      style={{ borderColor: color }}
                     >
+                      <Shine rarity={item.rarity} />
                       <div
                         className="text-[9px] tracking-[0.3em] mb-2"
                         style={{ color }}

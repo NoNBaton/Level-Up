@@ -5,7 +5,7 @@ import { getSessionPlayerId } from "@/lib/session";
 
 const SECRET = process.env.EXERCISE_SECRET || process.env.PUSHUP_SECRET || "dev-secret-change-me";
 const MIN_REP_MS: Record<string, number> = { pushup: 700, squat: 900 };
-const MAX_SESSION_MS = 15 * 60 * 1000;      // для отжиманий и приседаний
+const MAX_SESSION_MS = 30 * 60 * 1000;     // для отжиманий и приседаний
 const MAX_RUN_MS = 3 * 60 * 60 * 1000;      // для пробежки
 const sign = (p: string) => crypto.createHmac("sha256", SECRET).update(p).digest("hex");
 
