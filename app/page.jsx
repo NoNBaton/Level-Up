@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import BootScreen from "./components/BootScreen";
+import EyesLoader from "./components/EyesLoader";
 import SystemWindow, {
   SystemFrame,
   SysSubtitle,
@@ -379,7 +379,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoaded || bootPhase !== "loading") return;
     const elapsed = Date.now() - bootStartRef.current;
-    const minTime = willAwaken ? 4200 : 1100;
+    const minTime = willAwaken ? 4000 : 2000;
     const wait = Math.max(0, minTime - elapsed);
     const t = setTimeout(() => setBootPhase("poweron"), wait);
     return () => clearTimeout(t);
@@ -1067,22 +1067,9 @@ export default function HomePage() {
     playSound(SOUNDS.closeModal);
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
-
   // ---------- Отрисовка ----------
   if (bootPhase !== "done") {
-    return (
-      <BootScreen
-        powerOn={bootPhase === "poweron"}
-        awaken={willAwaken}
-        onAwakenDone={() => {
-          try {
-            sessionStorage.setItem("levelup_awake_shown", "1");
-          } catch {
-            // ignore
-          }
-        }}
-      />
-    );
+    return <EyesLoader leaving={bootPhase === "poweron"} quick={!willAwaken} />;
   }
 
   // Врата подземелья: показываются один раз новому игроку
